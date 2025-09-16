@@ -6,7 +6,7 @@ from nltk.tokenize import sent_tokenize
 nlp = spacy.load("fr_core_news_sm")
 
 # Lire le fichier texte
-with open("mon_texte.txt", "r", encoding="utf-8") as f:
+with open("Corpus_ASIMOV/Fondation_foudroyée_sample.txt", "r", encoding="utf-8") as f:
     texte = f.read()
 
 # Découper en phrases
