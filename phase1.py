@@ -17,7 +17,7 @@ with open(f"text_dataset/{args.input_file}", "r", encoding="utf-8") as f:
     
 # same file name, but in the output folder
 output_file = os.path.join("output", os.path.basename(args.input_file))
-output_file = output_file.replace(".txt", ".json")
+output_file = output_file.replace(".txt", ".raw.json")
 
 sentences = re.split(r'(?<=[a-zA-Z )"]{2}[.!?]) +|"|- \d -', text)
 
