@@ -35,11 +35,28 @@ class DebugFunc:
         result = self.func(*args, **kwargs)
         print(f"Function {self.func.__name__} called with args: {args}, kwargs: {kwargs}. Result: {result}")
         return result
+
+
+def split_word_with_quote(word : str) -> list[str]:
+    if "'" in word:
+        parts = word.split("'")
+        print(f"Splitting word with quote: {word} -> {parts}")
+        return [part for part in parts if part]
+    return [word]
+
+def split_words_with_quote(words : list[str]) -> list[str]:
+    result = []
+    for word in words:
+        result.extend(split_word_with_quote(word))
+    return result
     
 
 def is_determinant(word : str) -> bool:
     determinants = ["le", "la", "les", "un", "une", "des", "du", "l'"]
-    return word.lower() in determinants
+    suffixes = ["-le", "-la", "-les", "-un", "-une", "-des", "-du", "-l'", "-il", "-elle", "-ils", "-elles",
+                "-vous", "-nous", "-mon", "-ma", "-mes", "-ton", "-ta", "-tes", "-son", "-sa", "-ses",
+                "-notre", "-nos", "-votre", "-vos", "-ce", "-cette", "-ces", "-y"]
+    return word.lower() in determinants or any(word.lower().endswith(suffix) for suffix in suffixes)
 
 @DebugFunc
 def is_pronoun(word : str) -> bool:
@@ -50,29 +67,37 @@ def is_pronoun(word : str) -> bool:
                 "ce", "cette", "ces",
                 "on"
                 ]
-    prefixes = ["j'", "c'"]  
+    prefixes = ["J'", "C'", "L'", "Jusqu'", "D'", "Qu'", "N'", "S'"]  
 
     w = word.lower()
-    return w in pronouns or any(w.startswith(prefix) for prefix in prefixes)
+    return w in pronouns or any(word.startswith(prefix) for prefix in prefixes)
 
-@DebugFunc
+@Cache
 def is_adverbe(word : str) -> bool:
     adverbs = [
     "aujourd'hui", "d'abord", "difficilement", "doute",
         "lentement", "là-bas", "part", "peut-être",
-        "vite", "oh", "aussi"]
+        "vite", "oh", "aussi", "naturellement", "jamais",]
     return word.lower() in adverbs
+
+def delete_page_numbers(text: str) -> str:
+    return re.sub(r"\n� \d+ � \n", '.', text)
 
 @DebugFunc
 def is_proper_noun(sentence : list[str], index : int) -> bool:
     word = sentence[index]
-    if index == 0:
-        if any(char in word for char in string.ascii_letters):  # first word of the sentence and contains at least one letter
-            # return not is_determinant(word) and not is_pronoun(word)
-            return word.lower() not in get_fonctional_words()
+    if not word[0].isupper():
+        return False
+    if index == 0:  # first word of the sentence and starts with a capital letter
+        if any(char in word for char in string.ascii_letters):  # contains at least one letter
+            return (
+                word.lower() not in get_fonctional_words()
+                and not is_pronoun(word)
+                and not is_adverbe(word)
+                and not is_determinant(word)
+            )
     else:
-        if word[0].isupper():            # not the first word of the sentence and starts with a capital letter
-            return True
+        return True # not the first word of the sentence and starts with a capital letter
     return False
 
 
@@ -80,9 +105,9 @@ def is_proper_noun(sentence : list[str], index : int) -> bool:
 def get_fonctional_words() -> list[str]:
     with open("fonctionnels_fr.txt", "r", encoding="utf-8") as f:
         words = f.read().splitlines()
+    with open("verbes.txt", "r", encoding="utf-8") as f:
+        words += f.read().splitlines()
     return [word.lower() for word in words if not word.startswith("#") and word.strip() != ""]
-
-
 
 parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
 parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
@@ -94,6 +119,8 @@ DebugFunc._debug = args.debug
 
 with open(f"text_dataset/{args.input_file}", "r", encoding="utf-8") as f:
     text = f.read()
+
+text = delete_page_numbers(text)
     
 # same file name, but in the output folder
 output_file = os.path.join("output", os.path.basename(args.input_file))
@@ -102,23 +129,22 @@ output_file = output_file.replace(".txt", ".parsed.json")
 # Split text into sentences using regex to handle specific cases
 # This regex splits at ., !, ? if preceded by at least two letters or a closing parenthesis or a quote
 # It also splits at ... followed by space, or at quotes, or at - digit -
-sentences = re.split(r'(?<=[\w )\"]{2}[.!?])|\.\.\. +|\"|- \d -', text)
+sentences = re.split(r'(?<=[\w )\"]{2}[.!?])|\.\.\.\ +|\"|- \d -', text)
 
 
 
 result = []
 for i in range(len(sentences)):
-    sentence = sentences[i].strip(" \n\t\r-")
+    sentence = sentences[i].strip(" \n\t\r-()")
     if sentence == "":
         continue
 
     words_list = word_tokenize(sentence, language="french")
+    words_list = split_words_with_quote(words_list)
     words_list_dict = []
     for j in range(len(words_list)):
         word = words_list[j]
         is_proper = is_proper_noun(words_list, j)
-        if args.proper and not is_proper:
-            continue
         
         if is_proper and words_list_dict and words_list_dict[-1]["is_proper_noun"]:
             words_list_dict[-1]["word"] += " " + word
@@ -126,10 +152,20 @@ for i in range(len(sentences)):
         else:
             words_list_dict.append({
                 "word": word,
-                "is_proper_noun": is_proper
+                "is_proper_noun": is_proper,
+                "position" : j
             })
     if words_list_dict:
-        result.append(words_list_dict)
+        result.append({
+            "sentence_index": i,
+            "full_sentence": sentence,
+            "words": words_list_dict
+        })
+
+if args.proper:
+    for sentence in result:
+        sentence["words"] = [word for word in sentence["words"] if word["is_proper_noun"]]
+    result = [sentence for sentence in result if sentence["words"]]
 
 os.makedirs("output", exist_ok=True)
 with open(output_file, "w", encoding="utf-8") as f_out:
