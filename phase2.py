@@ -66,7 +66,7 @@ def is_adverbe(word : str) -> bool:
     "nulle part", "devant", "derrière", "dessus", "dessous",
 
     "oui", "non", "si", "peut-être", "sûrement", "probablement",
-    "évidemment", "certainement", "sans doute",
+    "évidemment", "certainement", "sans doute","sur",
 
     "alors", "donc", "puis", "ensuite", "d’abord"]
     return word.lower() in adverbs
