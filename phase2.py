@@ -9,8 +9,19 @@ nltk.download('punkt_tab')
 
 from nltk.tokenize import sent_tokenize, word_tokenize
 
+class DebugFunc:
+    def __init__(self, func):
+        self.func = func
+
+    def __call__(self, *args, **kwargs):
+        result = self.func(*args, **kwargs)
+        print(f"Function {self.func.__name__} called with args: {args}, kwargs: {kwargs}. Result: {result}")
+        return result
+    
+
 parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
 parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
+parser.add_argument("--proper", "-p", action="store_true", help="Only keep proper nouns.")
 args = parser.parse_args()
 
 with open(f"text_dataset/{args.input_file}", "r", encoding="utf-8") as f:
@@ -20,12 +31,13 @@ with open(f"text_dataset/{args.input_file}", "r", encoding="utf-8") as f:
 output_file = os.path.join("output", os.path.basename(args.input_file))
 output_file = output_file.replace(".txt", ".parsed.json")
 
-sentences = re.split(r'(?<=[a-zA-Z )"]{2}[.!?]) +|"|- \d -', text)
+sentences = re.split(r'(?<=[a-zA-Z )\"]{2}[.!?])|\.\.\. +|\"|- \d -', text)
 
 def is_determinant(word : str) -> bool:
     determinants = ["le", "la", "les", "un", "une", "des", "du", "l'"]
     return word.lower() in determinants
 
+@DebugFunc
 def is_pronoun(word : str) -> bool:
     pronouns = ["je", "tu", "il", "elle", "nous", "vous", "ils", "elles",
                 "me", "te", "se", "moi", "toi", "lui", "eux",
@@ -35,6 +47,7 @@ def is_pronoun(word : str) -> bool:
                 "on"]
     return word.lower() in pronouns
 
+@DebugFunc
 def is_proper_noun(sentence : list[str], index : int) -> bool:
     word = sentence[index]
     if index == 0:
@@ -55,9 +68,12 @@ for i in range(len(sentences)):
     words_list_dict = []
     for j in range(len(words_list)):
         word = words_list[j]
+        is_proper = is_proper_noun(words_list, j)
+        if args.proper and not is_proper:
+            continue
         words_list_dict.append({
             "word": word,
-            "is_proper_noun": is_proper_noun(words_list, j)
+            "is_proper_noun": is_proper
         })
     result.append(words_list_dict)
 
