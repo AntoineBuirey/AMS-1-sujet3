@@ -48,25 +48,19 @@ def is_pronoun(word : str) -> bool:
                 "mon", "ma", "mes", "ton", "ta", "tes", "son", "sa", "ses",
                 "notre", "nos", "votre", "vos",
                 "ce", "cette", "ces",
-                "on"]
-    return word.lower() in pronouns
+                "on"
+                ]
+    prefixes = ["j'", "c'"]  
+
+    w = word.lower()
+    return w in pronouns or any(w.startswith(prefix) for prefix in prefixes)
+
 @DebugFunc
 def is_adverbe(word : str) -> bool:
     adverbs = [
-    "très", "trop", "assez", "beaucoup", "peu", "tellement", "autant",
-
-    "bien", "mal", "vite", "lentement", "facilement", "difficilement", "ainsi",
-
-    "toujours", "souvent", "parfois", "jamais", "encore", "déjà", "enfin",
-    "maintenant", "bientôt", "longtemps", "aujourd’hui", "demain", "hier",
-
-    "ici", "là", "là-bas", "ailleurs", "dedans", "dehors", "partout",
-    "nulle part", "devant", "derrière", "dessus", "dessous",
-
-    "oui", "non", "si", "peut-être", "sûrement", "probablement",
-    "évidemment", "certainement", "sans doute","sur",
-
-    "alors", "donc", "puis", "ensuite", "d’abord"]
+    "aujourd'hui", "d'abord", "difficilement", "doute",
+        "lentement", "là-bas", "part", "peut-être",
+        "vite", "oh", "aussi"]
     return word.lower() in adverbs
 
 @DebugFunc
