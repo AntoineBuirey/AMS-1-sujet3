@@ -46,6 +46,24 @@ def is_pronoun(word : str) -> bool:
                 "ce", "cette", "ces",
                 "on"]
     return word.lower() in pronouns
+@DebugFunc
+def is_adverbe(word : str) -> bool:
+    adverbs = [
+    "très", "trop", "assez", "beaucoup", "peu", "tellement", "autant",
+
+    "bien", "mal", "vite", "lentement", "facilement", "difficilement", "ainsi",
+
+    "toujours", "souvent", "parfois", "jamais", "encore", "déjà", "enfin",
+    "maintenant", "bientôt", "longtemps", "aujourd’hui", "demain", "hier",
+
+    "ici", "là", "là-bas", "ailleurs", "dedans", "dehors", "partout",
+    "nulle part", "devant", "derrière", "dessus", "dessous",
+
+    "oui", "non", "si", "peut-être", "sûrement", "probablement",
+    "évidemment", "certainement", "sans doute",
+
+    "alors", "donc", "puis", "ensuite", "d’abord"]
+    return word.lower() in adverbs
 
 @DebugFunc
 def is_proper_noun(sentence : list[str], index : int) -> bool:
