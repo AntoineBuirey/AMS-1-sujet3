@@ -9,6 +9,21 @@ nltk.download('punkt_tab')
 
 from nltk.tokenize import sent_tokenize, word_tokenize
 
+class Cache:
+    _cache = {}
+    
+    def __init__(self, func):
+        self.func = func
+        
+    def __call__(self, *args):
+        func_cache = Cache._cache.get(self.func.__name__, {})
+        if str(args) in func_cache:
+            return func_cache[str(args)]
+        Cache._cache[self.func.__name__] = func_cache
+        result = self.func(*args)
+        func_cache[str(args)] = result
+        return result
+
 class DebugFunc:
     _debug = False
     def __init__(self, func):
@@ -21,23 +36,6 @@ class DebugFunc:
         print(f"Function {self.func.__name__} called with args: {args}, kwargs: {kwargs}. Result: {result}")
         return result
     
-
-parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
-parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
-parser.add_argument("--proper", "-p", action="store_true", help="Only keep proper nouns.")
-parser.add_argument("--debug", "-d", action="store_true", help="Enable debug mode.")
-args = parser.parse_args()
-
-DebugFunc._debug = args.debug
-
-with open(f"text_dataset/{args.input_file}", "r", encoding="utf-8") as f:
-    text = f.read()
-    
-# same file name, but in the output folder
-output_file = os.path.join("output", os.path.basename(args.input_file))
-output_file = output_file.replace(".txt", ".parsed.json")
-
-sentences = re.split(r'(?<=[a-zA-Z )\"]{2}[.!?])|\.\.\. +|\"|- \d -', text)
 
 def is_determinant(word : str) -> bool:
     determinants = ["le", "la", "les", "un", "une", "des", "du", "l'"]
@@ -76,11 +74,43 @@ def is_proper_noun(sentence : list[str], index : int) -> bool:
     word = sentence[index]
     if index == 0:
         if any(char in word for char in string.ascii_letters):  # first word of the sentence and contains at least one letter
-            return not is_determinant(word) and not is_pronoun(word)
+            # return not is_determinant(word) and not is_pronoun(word)
+            return word.lower() not in get_fonctional_words()
     else:
         if word[0].isupper():            # not the first word of the sentence and starts with a capital letter
             return True
     return False
+
+
+@Cache
+def get_fonctional_words() -> list[str]:
+    with open("fonctionnels_fr.txt", "r", encoding="utf-8") as f:
+        words = f.read().splitlines()
+    return [word.lower() for word in words if not word.startswith("#") and word.strip() != ""]
+
+
+
+parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
+parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
+parser.add_argument("--proper", "-p", action="store_true", help="Only keep proper nouns.")
+parser.add_argument("--debug", "-d", action="store_true", help="Enable debug mode.")
+args = parser.parse_args()
+
+DebugFunc._debug = args.debug
+
+with open(f"text_dataset/{args.input_file}", "r", encoding="utf-8") as f:
+    text = f.read()
+    
+# same file name, but in the output folder
+output_file = os.path.join("output", os.path.basename(args.input_file))
+output_file = output_file.replace(".txt", ".parsed.json")
+
+# Split text into sentences using regex to handle specific cases
+# This regex splits at ., !, ? if preceded by at least two letters or a closing parenthesis or a quote
+# It also splits at ... followed by space, or at quotes, or at - digit -
+sentences = re.split(r'(?<=[\w )\"]{2}[.!?])|\.\.\. +|\"|- \d -', text)
+
+
 
 result = []
 for i in range(len(sentences)):
