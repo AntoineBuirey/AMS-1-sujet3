@@ -1,57 +1,53 @@
+# builtin modules
 import re
-import nltk
 import argparse
 import os
 import json
 import string
+
+# external modules
+import nltk
 nltk.download('punkt')
 nltk.download('punkt_tab') 
 
 from nltk.tokenize import sent_tokenize, word_tokenize
 
-class Cache:
-    _cache = {}
-    
-    def __init__(self, func):
-        self.func = func
-        
-    def __call__(self, *args):
-        func_cache = Cache._cache.get(self.func.__name__, {})
-        if str(args) in func_cache:
-            return func_cache[str(args)]
-        Cache._cache[self.func.__name__] = func_cache
-        result = self.func(*args)
-        func_cache[str(args)] = result
-        return result
-
-class DebugFunc:
-    _debug = False
-    def __init__(self, func):
-        self.func = func
-
-    def __call__(self, *args, **kwargs):
-        if not DebugFunc._debug:
-            return self.func(*args, **kwargs)
-        result = self.func(*args, **kwargs)
-        print(f"Function {self.func.__name__} called with args: {args}, kwargs: {kwargs}. Result: {result}")
-        return result
+# local modules
+from utils import Cache, DebugFunc
 
 
-def split_word_with_quote(word : str) -> list[str]:
-    if "'" in word:
-        parts = word.split("'")
-        print(f"Splitting word with quote: {word} -> {parts}")
-        return [part for part in parts if part]
+
+
+def split_word_with_quote_dash(word : str) -> list[str]:
+    """
+    Split a word containing a quote or a dash into multiple parts.
+    Handle one word at a time.
+    E.g. "l'amour" -> ["l'", "amour"]
+    """
+    if "'" in word or '-' in word:
+        # parts = word.split("'")
+        parts = re.split(r"(')|(-)", word)
+        parts = [part for part in parts if part and part not in ["'", "-"]]
+        # print(f"Splitting word with quote: {word} -> {parts}")
+        return parts
     return [word]
 
-def split_words_with_quote(words : list[str]) -> list[str]:
+def split_words_with_quote_dash(words : list[str]) -> list[str]:
+    """
+    Split words containing quotes or dashes into multiple parts.
+    Handle a complete sentence at once.
+    E.g. ["l'amour", "est", "beau"] -> ["l'", "amour", "est", "beau"]
+    """
     result = []
     for word in words:
-        result.extend(split_word_with_quote(word))
+        result.extend(split_word_with_quote_dash(word))
     return result
     
 
 def is_determinant(word : str) -> bool:
+    """
+    Check if a word is a determinant (article, demonstrative, possessive).
+    """
     determinants = ["le", "la", "les", "un", "une", "des", "du", "l'"]
     suffixes = ["-le", "-la", "-les", "-un", "-une", "-des", "-du", "-l'", "-il", "-elle", "-ils", "-elles",
                 "-vous", "-nous", "-mon", "-ma", "-mes", "-ton", "-ta", "-tes", "-son", "-sa", "-ses",
@@ -60,6 +56,9 @@ def is_determinant(word : str) -> bool:
 
 @DebugFunc
 def is_pronoun(word : str) -> bool:
+    """
+    Check if a word is a pronoun (personal, reflexive, possessive, demonstrative).
+    """
     pronouns = ["je", "tu", "il", "elle", "nous", "vous", "ils", "elles",
                 "me", "te", "se", "moi", "toi", "lui", "eux",
                 "mon", "ma", "mes", "ton", "ta", "tes", "son", "sa", "ses",
@@ -74,17 +73,43 @@ def is_pronoun(word : str) -> bool:
 
 @Cache
 def is_adverbe(word : str) -> bool:
+    """
+    Check if a word is an adverb.
+    """
     adverbs = [
     "aujourd'hui", "d'abord", "difficilement", "doute",
         "lentement", "là-bas", "part", "peut-être",
         "vite", "oh", "aussi", "naturellement", "jamais",]
     return word.lower() in adverbs
 
-def delete_page_numbers(text: str) -> str:
-    return re.sub(r"\n� \d+ � \n", '.', text)
+def mark_page_numbers(text: str) -> str:
+    """
+    Mark page numbers in the text with a special token.
+    """
+    return re.sub(r"\n� \d+ � \n", '__PAGE_BREAK__', text) # using __PAGE_BREAK__ as a placeholder for page breaks
+
+def remove_newlines(text: str) -> str:
+    """
+    Remove newlines from the text, replacing them with spaces where appropriate.
+    """
+    # \n must be replaced by a space only if it is not preceded by a period or followed by a lowercase letter
+    # else, it must be just removed
+    text = re.sub(r"(?<!\.)\n(?![a-zàâäéèêëïîôöùûüç])", " ", text)
+    text = re.sub(r"(?<=\.)\n", "", text)
+    text = re.sub(r"(?<!\.)\n", " ", text)
+    # Finally, replace multiple spaces by a single space
+    text = re.sub(r" +", " ", text)
+    return text
 
 @DebugFunc
 def is_proper_noun(sentence : list[str], index : int) -> bool:
+    """
+    Check if a word in a sentence is a proper noun.
+    A proper noun is defined as a word that starts with a capital letter,
+    is not the first word of the sentence (unless it is the only word),
+    is not a functional word (determiner, pronoun, adverb, etc.),
+    and contains at least one letter.
+    """
     word = sentence[index]
     if not word[0].isupper():
         return False
@@ -103,11 +128,19 @@ def is_proper_noun(sentence : list[str], index : int) -> bool:
 
 @Cache
 def get_fonctional_words() -> list[str]:
-    with open("fonctionnels_fr.txt", "r", encoding="utf-8") as f:
-        words = f.read().splitlines()
-    with open("verbes.txt", "r", encoding="utf-8") as f:
-        words += f.read().splitlines()
+    """
+    Get a list of functional words (determiners, pronouns, adverbs, etc.) from predefined files.
+    """
+    words : list[str] = []
+    files = ["fonctionnels_fr.txt", "verbes.txt"]
+    for file in files:
+        with open(file, "r", encoding="utf-8") as f:
+            words += f.read().splitlines()
     return [word.lower() for word in words if not word.startswith("#") and word.strip() != ""]
+
+
+
+# Main script
 
 parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
 parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
@@ -120,7 +153,7 @@ DebugFunc._debug = args.debug
 with open(f"text_dataset/{args.input_file}", "r", encoding="utf-8") as f:
     text = f.read()
 
-text = delete_page_numbers(text)
+text = mark_page_numbers(text)
     
 # same file name, but in the output folder
 output_file = os.path.join("output", os.path.basename(args.input_file))
@@ -132,17 +165,39 @@ output_file = output_file.replace(".txt", ".parsed.json")
 sentences = re.split(r'(?<=[\w )\"]{2}[.!?])|\.\.\.\ +|\"|- \d -', text)
 
 
+# Since we got 1 page over 2, some sentences are have a missing part due to page breaks.
+# The goal here is to detect these cases and split the sentence into two sentences over the page break.
+# Later, the __PAGE_BREAK__ marker will be removed, and a "maybe_incomplete" flag will be set to True for these sentences.
+# Theses sentences will have a higher error probability when counting proper nouns
+for i in range(len(sentences)):
+    if "__PAGE_BREAK__" in sentences[i]:  # page break
+        sentences[i], s2 = sentences[i].split("__PAGE_BREAK__", 1)
+        sentences[i] += "__PAGE_BREAK__"
+        s2 = "__PAGE_BREAK__" + s2
+        sentences.insert(i + 1, s2)
+        i += 1
 
 result = []
 for i in range(len(sentences)):
-    sentence = sentences[i].strip(" \n\t\r-()")
+    maybe_incomplete = False
+    original_sentence = sentences[i]
+    if "__PAGE_BREAK__" in original_sentence:  # set the flag and remove the marker for incomplete sentences
+        maybe_incomplete = True
+        original_sentence = original_sentence.replace("__PAGE_BREAK__", "")
+    sentence = original_sentence.strip(" \n\t\r-()")
+    sentence = remove_newlines(sentence)
+    
+    # Skip empty sentences
     if sentence == "":
         continue
 
     words_list = word_tokenize(sentence, language="french")
-    words_list = split_words_with_quote(words_list)
+    words_list = split_words_with_quote_dash(words_list)
     words_list_dict = []
     for j in range(len(words_list)):
+        words_list[j] = words_list[j].strip(string.punctuation)
+        if words_list[j] == "":
+            continue
         word = words_list[j]
         is_proper = is_proper_noun(words_list, j)
         
@@ -158,7 +213,9 @@ for i in range(len(sentences)):
     if words_list_dict:
         result.append({
             "sentence_index": i,
+            "original_sentence": original_sentence,
             "full_sentence": sentence,
+            "maybe_incomplete": maybe_incomplete,
             "words": words_list_dict
         })
 
