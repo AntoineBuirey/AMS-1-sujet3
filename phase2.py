@@ -309,10 +309,7 @@ print(f"[INFO] Auto-démotés : {len(auto_demote_tokens)} mots, ex: {list(auto_d
 
 promoted_bigrams = {bg for bg, c in proper_bigram_count.items() if c >= PROMOTE_MIN_BIGRAM}
 
-DEMOTE_TOKENS = {
-    "général","gouverneur","empereur","impératrice","roi","reine","duc","comte",
-    "fondation","empire","ville","maison","république","royaume"
-}
+
 
 # --------- PASSAGE B : tagging final ---------
 result = []
