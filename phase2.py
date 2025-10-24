@@ -319,6 +319,7 @@ for item in prepared:
     words_list_dict = []
     for j, tok in enumerate(tokens):
         is_prop = is_proper_noun_ctx(tokens, j, all_caps)
+        # is_prop = is_prop and tokens[j].lower() in (result[s]["words"][w]["word"].lower() for s in range(len(result)) for w in range(len(result[s]["words"])) if result[s]["words"][w]["is_proper_noun"])
         if is_prop and words_list_dict and words_list_dict[-1]["is_proper_noun"]:
             words_list_dict[-1]["word"] += " " + tok
         else:
