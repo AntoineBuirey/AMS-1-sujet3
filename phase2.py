@@ -11,7 +11,7 @@ nltk.download('punkt')
 nltk.download('punkt_tab') 
 
 from nltk.tokenize import sent_tokenize, word_tokenize
-
+from collections import defaultdict
 # local modules
 from utils import Cache, DebugFunc
 
@@ -100,6 +100,19 @@ def remove_newlines(text: str) -> str:
     # Finally, replace multiple spaces by a single space
     text = re.sub(r" +", " ", text)
     return text
+def normalize_token(w: str) -> str:
+    return w.strip(string.punctuation).lower()
+
+def is_all_caps_sentence(tokens: list[str]) -> bool:
+    letters = [ch for w in tokens for ch in w if ch.isalpha()]
+    if not letters:
+        return False
+    return sum(ch.isupper() for ch in letters) / len(letters) >= 0.85
+
+def is_acronym(word: str) -> bool:
+    alpha = ''.join(ch for ch in word if ch.isalpha())
+    return len(alpha) >= 2 and alpha.isupper()
+
 
 @DebugFunc
 def is_proper_noun(sentence : list[str], index : int) -> bool:
@@ -124,6 +137,42 @@ def is_proper_noun(sentence : list[str], index : int) -> bool:
     else:
         return True # not the first word of the sentence and starts with a capital letter
     return False
+def is_proper_noun_ctx(sentence_tokens: list[str], index: int, all_caps: bool,
+                       known_proper_tokens=None, known_proper_bigrams=None) -> bool:
+    word = sentence_tokens[index]
+    wnorm = normalize_token(word)
+    if not wnorm:
+        return False
+
+    # garde-fous
+    if (wnorm in get_fonctional_words()
+    or is_pronoun(word)
+    or is_adverbe(word)
+    or is_determinant(word)
+    or wnorm in auto_demote_tokens):   # ← ajouté ici
+        return False
+
+    if not all_caps:
+        return is_proper_noun(sentence_tokens, index)
+
+    # ===== ALL-CAPS minimal =====
+    if is_acronym(word):
+        return True
+
+    try:
+        if wnorm in promoted_tokens:
+            return True
+        prev = normalize_token(sentence_tokens[index-1]) if index-1 >= 0 else ""
+        nxt  = normalize_token(sentence_tokens[index+1]) if index+1 < len(sentence_tokens) else ""
+        if (wnorm, nxt) in promoted_bigrams or (prev, wnorm) in promoted_bigrams:
+            return True
+    except NameError:
+        pass
+
+    return False
+
+
+
 
 
 @Cache
@@ -177,47 +226,120 @@ for i in range(len(sentences)):
         sentences.insert(i + 1, s2)
         i += 1
 
-result = []
+# --------- PASSAGE 0 : préparer les phrases tokenisées ---------
+# --------- PASSAGE 0 : préparation ---------
+prepared = []
 for i in range(len(sentences)):
     maybe_incomplete = False
     original_sentence = sentences[i]
-    if "__PAGE_BREAK__" in original_sentence:  # set the flag and remove the marker for incomplete sentences
+    if "__PAGE_BREAK__" in original_sentence:
         maybe_incomplete = True
         original_sentence = original_sentence.replace("__PAGE_BREAK__", "")
     sentence = original_sentence.strip(" \n\t\r-()")
     sentence = remove_newlines(sentence)
-    
-    # Skip empty sentences
     if sentence == "":
         continue
 
-    words_list = word_tokenize(sentence, language="french")
-    words_list = split_words_with_quote_dash(words_list)
+    tokens = word_tokenize(sentence, language="french")
+    tokens = split_words_with_quote_dash(tokens)
+    tokens = [t.strip(string.punctuation) for t in tokens if t.strip(string.punctuation) != ""]
+    prepared.append({
+        "sentence_index": i,
+        "original_sentence": original_sentence,
+        "full_sentence": sentence,
+        "maybe_incomplete": maybe_incomplete,
+        "tokens": tokens,
+        "all_caps": is_all_caps_sentence(tokens)
+    })
+
+# --------- PASSAGE A : apprentissage des noms propres depuis phrases non all-caps ---------
+proper_token_count = defaultdict(int)
+nonproper_lower_count = defaultdict(int)
+proper_bigram_count = defaultdict(int)
+
+for item in prepared:
+    if item["all_caps"]:
+        continue
+    tokens = item["tokens"]
+    flags = [is_proper_noun(tokens, j) for j in range(len(tokens))]
+
+    # Compte tokens
+    for j, tok in enumerate(tokens):
+        w = normalize_token(tok)
+        if not w:
+            continue
+        if flags[j]:
+            proper_token_count[w] += 1
+        else:
+            # on ne compte "non-proper" que si le token est observé en minuscules
+            if tok and tok[0].islower():
+                nonproper_lower_count[w] += 1
+
+    # Compte bigrammes consécutifs tagués proper
+    for j in range(len(tokens)-1):
+        if flags[j] and flags[j+1]:
+            t1 = normalize_token(tokens[j]); t2 = normalize_token(tokens[j+1])
+            if t1 and t2:
+                proper_bigram_count[(t1, t2)] += 1
+                PROMOTE_MIN_COUNT = 1        # min #observations proper pour considérer
+# --------- DÉTECTION DES NOMS PROPRES CONNUS ---------
+PROMOTE_MIN_SCORE = 0.6      # seuil confiance = proper / (proper + nonproper_lower)
+PROMOTE_MIN_BIGRAM = 1       # min #observations pour un bigramme proper
+
+promoted_tokens = set()
+for w, c_prop in proper_token_count.items():
+    c_non = nonproper_lower_count.get(w, 0)
+    score = c_prop / (c_prop + c_non) if (c_prop + c_non) > 0 else 1.0
+    if c_prop >= PROMOTE_MIN_COUNT and score >= PROMOTE_MIN_SCORE:
+        promoted_tokens.add(w)
+        # -------- AUTO-DÉMOTION --------
+DEMOTE_MIN_COUNT = 3        # minimum de fois vu en minuscules pour être fiable
+DEMOTE_MAX_RATIO = 0.3      # si proper/(proper+nonproper) < 0.3 => démoté
+
+auto_demote_tokens = set()
+for w, c_non in nonproper_lower_count.items():
+    c_prop = proper_token_count.get(w, 0)
+    total = c_prop + c_non
+    if total >= DEMOTE_MIN_COUNT:
+        ratio = c_prop / total
+        if ratio < DEMOTE_MAX_RATIO:
+            auto_demote_tokens.add(w)
+
+print(f"[INFO] Auto-démotés : {len(auto_demote_tokens)} mots, ex: {list(auto_demote_tokens)[:10]}")
+
+promoted_bigrams = {bg for bg, c in proper_bigram_count.items() if c >= PROMOTE_MIN_BIGRAM}
+
+DEMOTE_TOKENS = {
+    "général","gouverneur","empereur","impératrice","roi","reine","duc","comte",
+    "fondation","empire","ville","maison","république","royaume"
+}
+
+# --------- PASSAGE B : tagging final ---------
+result = []
+for item in prepared:
+    tokens = item["tokens"]
+    all_caps = item["all_caps"]
     words_list_dict = []
-    for j in range(len(words_list)):
-        words_list[j] = words_list[j].strip(string.punctuation)
-        if words_list[j] == "":
-            continue
-        word = words_list[j]
-        is_proper = is_proper_noun(words_list, j)
-        
-        if is_proper and words_list_dict and words_list_dict[-1]["is_proper_noun"]:
-            words_list_dict[-1]["word"] += " " + word
-            continue
+    for j, tok in enumerate(tokens):
+        is_prop = is_proper_noun_ctx(tokens, j, all_caps)
+        if is_prop and words_list_dict and words_list_dict[-1]["is_proper_noun"]:
+            words_list_dict[-1]["word"] += " " + tok
         else:
             words_list_dict.append({
-                "word": word,
-                "is_proper_noun": is_proper,
-                "position" : j
+                "word": tok,
+                "is_proper_noun": is_prop,
+                "position": j
             })
     if words_list_dict:
         result.append({
-            "sentence_index": i,
-            "original_sentence": original_sentence,
-            "full_sentence": sentence,
-            "maybe_incomplete": maybe_incomplete,
+            "sentence_index": item["sentence_index"],
+            "original_sentence": item["original_sentence"],
+            "full_sentence": item["full_sentence"],
+            "maybe_incomplete": item["maybe_incomplete"],
             "words": words_list_dict
         })
+
+
 
 if args.proper:
     for sentence in result:
