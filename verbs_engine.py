@@ -3,6 +3,7 @@ from typing import Any
 from random import choice
 from string import ascii_lowercase, digits
 import json
+import zipfile
 
 
 class NodeType(Enum):
@@ -97,12 +98,28 @@ class VerbData:
     def __str__(self):
         return f"{tense_map_inv[self.tense]} {mood_map_inv[self.mood]} {pronoun_map_inv[self.pronoun]} - {self.infinitive}"
     
-    def to_string(self):
+    def serialize(self):
         return f"{self.infinitive},{self.mood.value},{self.tense.value},{self.pronoun.value}"
     
+    def serialize_binary(self) -> bytes:
+        """
+        Return a binary representation of the VerbData as follow:
+        "infinitive\x1emood\x1etense\x1epronoun"
+        """
+        return f"{self.infinitive}\x1e{self.mood.value}\x1e{self.tense.value}\x1e{self.pronoun.value}".encode("utf-8")
+    
     @classmethod
-    def from_string(cls, data: str) -> 'VerbData':
+    def deserialize(cls, data: str) -> 'VerbData':
         parts = data.split(',')
+        infinitive = parts[0]
+        mood = Mood(int(parts[1]))
+        tense = Tense(int(parts[2]))
+        pronoun = Pronoun(int(parts[3]))
+        return cls(infinitive, mood, tense, pronoun)
+    
+    @classmethod
+    def deserialize_binary(cls, data: bytes) -> 'VerbData':
+        parts = data.decode("utf-8").split('\x1e')
         infinitive = parts[0]
         mood = Mood(int(parts[1]))
         tense = Tense(int(parts[2]))
@@ -151,32 +168,21 @@ class Node:
 
     def is_verb(self) -> bool:
         raise NotImplementedError("is_verb method should be implemented in subclasses.")
-    
-    def save(self) -> dict:
-        children_data = {key: child.save() for key, child in self.children.items()}
-        return {
-            "v": self.serialize(),
-            "c": children_data
-        }
-    
-    @classmethod
-    def load(cls, data: dict) -> 'Node':
-        value = data["v"]
-        if ',' in value:  # Simple check to differentiate VerbNode from LetterNode
-            node = VerbNode.deserialize(value)
-        else:
-            node = LetterNode.deserialize(value)
-        for key, child_data in data["c"].items():
-            child_node = Node.load(child_data)
-            node.add_child(child_node)
-        return node
+        
         
     def serialize(self) -> str:
         raise NotImplementedError("serialize method should be implemented in subclasses.")
     
+    def serialize_binary(self) -> bytes:
+        raise NotImplementedError("serialize_binary method should be implemented in subclasses.")
+    
     @classmethod
     def deserialize(cls, data: str) -> 'Node':
         raise NotImplementedError("deserialize method should be implemented in subclasses.")
+    
+    @classmethod
+    def deserialize_binary(cls, data: bytes) -> 'Node':
+        raise NotImplementedError("deserialize_binary method should be implemented in subclasses.")
 
 
 class LetterNode(Node):
@@ -188,10 +194,18 @@ class LetterNode(Node):
     
     def serialize(self) -> str:
         return self.value
+
+    def serialize_binary(self) -> bytes:
+        return self.value.encode("utf-8")
     
     @classmethod
     def deserialize(cls, data: str) -> 'LetterNode':
         return cls(data)
+    
+    @classmethod
+    def deserialize_binary(cls, data: bytes) -> 'LetterNode':
+        return cls(data.decode("utf-8"))
+
     
     
 class VerbNode(Node):
@@ -206,11 +220,19 @@ class VerbNode(Node):
         return True
 
     def serialize(self) -> str:
-        return self.value.to_string()
+        return self.value.serialize()
+    
+    def serialize_binary(self) -> bytes:
+        return self.value.serialize_binary()   
     
     @classmethod
     def deserialize(cls, data: str) -> 'VerbNode':
-        verb_data = VerbData.from_string(data)
+        verb_data = VerbData.deserialize(data)
+        return cls(verb_data)
+    
+    @classmethod
+    def deserialize_binary(cls, data: bytes) -> 'VerbNode':
+        verb_data = VerbData.deserialize_binary(data)
         return cls(verb_data)
 
 
@@ -247,6 +269,19 @@ class VerbTree:
                 return True
         return False
     
+    def __iter__(self):
+        """Iterate over all verb nodes in the tree. Yields tuples of (conjugated_form, VerbData)."""
+        def traverse(node: Node, current_verb: str):
+            if node.is_verb():
+                verb_data: VerbData = node.value  # type: ignore
+                yield (current_verb, verb_data)
+            for child in node.children.values():
+                if isinstance(child, LetterNode):
+                    yield from traverse(child, current_verb + child.value)
+                elif isinstance(child, VerbNode):
+                    yield from traverse(child, current_verb)
+        yield from traverse(self.root, "")
+    
     def get(self, verb : str) -> list[VerbData]:
         current_node = self.root
         for char in verb:
@@ -263,19 +298,27 @@ class VerbTree:
         return verb_data_list
     
     def save(self, filepath : str) -> None:
-        data = self.root.save()
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
-    
+        with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            with zipf.open("data", 'w') as f:
+                for conjugated_form, verb_data in self:
+                    line = f"{conjugated_form}\x1d".encode("utf-8") + verb_data.serialize_binary() + b"\n"
+                    f.write(line)
+
     @classmethod
     def load(cls, filepath : str) -> 'VerbTree':
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
         tree = cls()
-        tree.root = Node.load(data)
+        with zipfile.ZipFile(filepath, 'r') as zipf:
+            with zipf.open("data", 'r') as f:
+                for line in f:
+                    line = line.rstrip(b"\n")
+                    conjugated_form, verb_data_bin = line.split(b"\x1d", 1)
+                    conjugated_form_str = conjugated_form.decode("utf-8")
+                    verb_data = VerbData.deserialize_binary(verb_data_bin)
+                    tree.insert(conjugated_form_str, verb_data)
         return tree
+        
     
-    def save_flat(self, filepath : str) -> None:
+    def save_json(self, filepath : str) -> None:
         verbs = []
 
         def traverse(node: Node, current_verb: str):
@@ -299,7 +342,7 @@ class VerbTree:
             json.dump(verbs, f, ensure_ascii=False, separators=(',', ':'))
             
     @classmethod
-    def load_flat(cls, filepath : str) -> 'VerbTree':
+    def load_json(cls, filepath : str) -> 'VerbTree':
         with open(filepath, "r", encoding="utf-8") as f:
             verbs = json.load(f)
         tree = cls()
@@ -345,78 +388,3 @@ class VerbTree:
         traverse(self.root)
         return list(verbs)
 
-
-if __name__ == "__main__":
-    import argparse
-    import time
-    
-    argparser = argparse.ArgumentParser(description="Verb Tree Operations")
-    argparser.add_argument("--list", action="store_true", help="List all infinitive verbs in the tree")
-    argparser.add_argument("--has", type=str, help="Check if a verb exists in the tree", action="store")
-    argparser.add_argument("--get", type=str, help="Get conjugation data for a verb", action="store")
-    argparser.add_argument("--extend", action="store_true", help="Extend the verb tree from verb_data.py")
-    argparser.add_argument("--save", type=str, help="Save the verb tree to a specified file", action="store")
-    argparser.add_argument("--save-flat", type=str, help="Save the verb tree in flat format to a specified file", action="store")
-    argparser.add_argument("--load", type=str, help="Load the verb tree from a specified file", action="store")
-    argparser.add_argument("--load-flat", type=str, help="Load the verb tree in flat format from a specified file", action="store")
-    args = argparser.parse_args()
-    
-    if not (args.list or args.has or args.extend or args.get or args.save or args.save_flat, args.load or args.load_flat):
-        argparser.print_help()
-        
-    tree = VerbTree()
-        
-    if args.load:
-        timer = time.time()
-        tree = VerbTree.load(args.load)
-        print(f"Verb tree loaded from {args.load} in {time.time() - timer:.6f} seconds")
-        
-    if args.load_flat:
-        timer = time.time()
-        tree = VerbTree.load_flat(args.load_flat)
-        print(f"Verb tree loaded in flat format from {args.load_flat} in {time.time() - timer:.6f} seconds")
-    
-    if not (args.load or args.load_flat):    
-        tree = VerbTree.load_flat("verb.data.json")
-    
-    if args.list:
-        print(tree.list_verbs())
-        
-    if args.has:
-        verb_to_check = args.has
-        exists = tree.search(verb_to_check)
-        if exists:
-            print(f"The verb '{verb_to_check}' exists in the tree.")
-        else:
-            print(f"The verb '{verb_to_check}' does NOT exist in the tree.")
-        
-    if args.get:
-        verb_to_get = args.get
-        conjugations = tree.get(verb_to_get)
-        if conjugations:
-            print(f"Conjugation data for '{verb_to_get}':")
-            for conjugation in conjugations:
-                print(f"  {conjugation}")
-        else:
-            print(f"No conjugation data found for '{verb_to_get}'.")
-    
-    if args.extend:
-        from verb_data import DATA
-        for verb in DATA:
-            tree.insert(verb[0], VerbData(verb[1], mood_map[verb[2]], tense_map[verb[3]], pronoun_map[verb[4]]))
-        
-        infinitive = set()
-        for verb in DATA:
-            infinitive.add(verb[1])
-        print(f"inserted {len(DATA)} items from verb_data.py\nverbs added:\n\t{"\n\t".join(sorted(infinitive))}")
-        tree.save("verb_tree.json")
-        
-    if args.save:
-        timer = time.time()
-        tree.save(args.save)
-        print(f"Verb tree saved to {args.save} in {time.time() - timer:.6f} seconds")
-        
-    if args.save_flat:
-        timer = time.time()
-        tree.save_flat(args.save_flat)
-        print(f"Verb tree saved in flat format to {args.save_flat} in {time.time() - timer:.6f} seconds")
