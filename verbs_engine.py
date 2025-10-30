@@ -184,7 +184,6 @@ class Node:
     def deserialize_binary(cls, data: bytes) -> 'Node':
         raise NotImplementedError("deserialize_binary method should be implemented in subclasses.")
 
-
 class LetterNode(Node):
     def __init__(self, value : str):
         super().__init__(value)
@@ -206,8 +205,6 @@ class LetterNode(Node):
     def deserialize_binary(cls, data: bytes) -> 'LetterNode':
         return cls(data.decode("utf-8"))
 
-    
-    
 class VerbNode(Node):
     def __init__(self, value : VerbData):
         super().__init__(value)
@@ -269,6 +266,24 @@ class VerbTree:
                 return True
         return False
     
+    def exist(self, conjugated_form : str, verb_data : VerbData) -> bool:
+        current_node = self.root
+        for char in conjugated_form:
+            if current_node is None:
+                return False
+            current_node = current_node.get_child(char)
+        if current_node is None:
+            return False
+        # Check if there's a verb node with the same data among the children
+        for child in current_node.children.values():
+            if child.is_verb() and \
+                child.value.infinitive == verb_data.infinitive and \
+                child.value.mood == verb_data.mood and \
+                child.value.tense == verb_data.tense and \
+                child.value.pronoun == verb_data.pronoun:
+                return True
+        return False
+    
     def __iter__(self):
         """Iterate over all verb nodes in the tree. Yields tuples of (conjugated_form, VerbData)."""
         def traverse(node: Node, current_verb: str):
@@ -317,7 +332,6 @@ class VerbTree:
                     tree.insert(conjugated_form_str, verb_data)
         return tree
         
-    
     def save_json(self, filepath : str) -> None:
         verbs = []
 
@@ -371,8 +385,7 @@ class VerbTree:
                 count += count_nodes(child)
             return count
         return count_nodes(self.root)
-    
-    
+
     def list_verbs(self) -> list[str]:
         """
         Extract all infinitive verbs from the VerbTree.
