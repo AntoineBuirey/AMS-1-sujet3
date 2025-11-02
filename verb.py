@@ -32,6 +32,17 @@ def set_autosave(value_str: str):
     global auto_save
     auto_save = value
     print(f"Auto-save set to {auto_save}")
+    
+    
+def remove_articles(infinitive: str) -> str:
+    """Remove leading articles from an infinitive verb."""
+    articles = ["je ", "tu ", "il ", "elle ", "on ", "nous ", "vous ", "ils ", "elles ", "il/elle ", "il/elle/on ", "ils/elles ", "j'"]
+    articles += ["que je ", "que tu ", "qu'il ", "qu'elle ", "qu'on ", "que nous ", "que vous ", "qu'ils ", "qu'elles ", "qu'il/elle ", "qu'il/elle/on ", "qu'ils/elles ", "que j'"]
+    infinitive_lower = infinitive.lower()
+    for article in articles:
+        if infinitive_lower.startswith(article):
+            return infinitive[len(article):].strip()
+    return infinitive
 
  
 ############################################# Loading #############################################
@@ -97,7 +108,7 @@ def get(verb_to_get: str):
     else:
         print(f"No conjugation data found for '{verb_to_get}'.")
 
-def lookup(infinitive_to_lookup: str, mood: str|None = None, tense: str|None = None, pronoun: str|None = None):
+def lookup(infinitive_to_lookup: str, mood: str = "", tense: str = "", pronoun: str = ""):
     """Lookup all conjugated forms for an infinitive verb. Usage: lookup <infinitive> [--mood <mood>] [--tense <tense>] [--pronoun <pronoun>]"""
     forms = [(f, i) for f, i in tree if i.infinitive == infinitive_to_lookup]
     if forms:
@@ -154,6 +165,7 @@ def harmonize(simulate : bool = False):
     count = 0
     for form, data in tree:
         new_form = form.lower()
+        new_form = remove_articles(new_form)
         new_infinitive = data.infinitive.lower()
         if new_form != form or new_infinitive != data.infinitive:
             print(f"Harmonizing: '{form}' -> '{new_form}', '{data.infinitive}' -> '{new_infinitive}'")
@@ -257,7 +269,11 @@ def mainloop():
         else:
             color = COLORS["green"]
         full_cmd = input(f"{color}{tree_filename.split("/")[-1]}> \033[0m").strip()
-        tokens = shlex.split(full_cmd)
+        try:
+            tokens = shlex.split(full_cmd)
+        except ValueError as e:
+            print(f"Error parsing command: {e}")
+            continue
         if not tokens:
             continue
         cmd = tokens[0]

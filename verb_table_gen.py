@@ -149,6 +149,27 @@ def save_generated(verb: str, data: list[list[str]]):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
+def gen_add_verb(verb: str, tree: VerbTree):
+    generated_data = generate_table(verb)
+    if not can_be_added(generated_data):
+        print(f"Skipping verb '{verb}' due to validation failure.")
+        save_generated(verb, generated_data)
+        print(f"Saved generated data for verb '{verb}' to file for further review.")
+        return
+    for entry in generated_data:
+        form_conjugated, infinitif, mode, temps, personne = entry
+        verb_data = VerbData(
+            infinitif,
+            mood_map[mode],
+            tense_map[temps],
+            pronoun_map[personne]
+        )
+        if tree.exist(form_conjugated, verb_data):
+            print(f"Form '{form_conjugated}' already exists in the tree. Skipping insertion.")
+            continue
+        tree.insert(form_conjugated, verb_data)
+
+
 def gen_insert(tree_file : str):
     config = get_config()
     infinitives_file = config.get("infinitives_file", "infinitives.json")
@@ -164,25 +185,8 @@ def gen_insert(tree_file : str):
             print(f"{i+1:0{nb_elements_length}}/{len(verbs):0{nb_elements_length}} - Skipping verb '{verb}' as per configuration.")
             continue
         print(f"{i+1:0{nb_elements_length}}/{len(verbs):0{nb_elements_length}} - Inserting conjugations for verb '{verb}' into the verb tree.")
-        generated_data = generate_table(verb)
-        if not can_be_added(generated_data, allow_manual=False):
-            print(f"Skipping verb '{verb}' due to validation failure.")
-            skipped.append(i)
-            save_generated(verb, generated_data)
-            print(f"Saved generated data for verb '{verb}' to file for further review.")
-            continue
-        for entry in generated_data:
-            form_conjugated, infinitif, mode, temps, personne = entry
-            verb_data = VerbData(
-                infinitif,
-                mood_map[mode],
-                tense_map[temps],
-                pronoun_map[personne]
-            )
-            if tree.exist(form_conjugated, verb_data):
-                print(f"Form '{form_conjugated}' already exists in the tree. Skipping insertion.")
-                continue
-            tree.insert(form_conjugated, verb_data)
+        
+        gen_add_verb(verb, tree)
         processed.append(i)
         config["processed"] = processed
         config["skipped"] = skipped
@@ -193,13 +197,37 @@ def gen_insert(tree_file : str):
 
 
 if __name__ == "__main__":
-    treefile = "verb.data"
+    import argparse
     
-    if not os.path.exists(treefile):
-        tree = VerbTree()
+    parser = argparse.ArgumentParser(description="Generate and insert verb conjugations into a verb tree.")
+    parser.add_argument("--all", action="store_true", help="Process all verbs without skipping any.")
+    parser.add_argument("--select", "-s", type=str, nargs="+", help="List of verb infinitives to process. In that mode, ignore the config file.")
+    args = parser.parse_args()
+    
+    if args.all:
+        treefile = "verb.data"
+        
+        if not os.path.exists(treefile):
+            tree = VerbTree()
+            tree.save(treefile)
+            print(f"Created empty verb tree file: {treefile}")
+        
+        gen_insert(treefile)
+    
+    elif args.select:
+        treefile = "verb.data"
+        
+        if not os.path.exists(treefile):
+            tree = VerbTree()
+            tree.save(treefile)
+            print(f"Created empty verb tree file: {treefile}")
+        
+        tree = VerbTree.load(treefile)
+        for verb in args.select:
+            print(f"Inserting conjugations for verb '{verb}' into the verb tree.")
+            gen_add_verb(verb, tree)
         tree.save(treefile)
-        print(f"Created empty verb tree file: {treefile}")
+        print(f"Finished inserting selected verbs into the verb tree '{treefile}'.")
     
-    gen_insert(treefile)
-    
-    
+    else:
+        parser.print_help()
