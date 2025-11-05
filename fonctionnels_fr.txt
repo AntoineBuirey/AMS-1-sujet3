@@ -110,6 +110,10 @@ crac
 cric
 ça
 çà
+cent
+cents
+cinq
+cinquante
 #################################
 #                                #
 #        CH                       #
@@ -161,6 +165,9 @@ du
 dudit
 durant
 duquel
+deux
+dix
+douze
 #################################
 #                                #
 #        E                        #
@@ -231,6 +238,7 @@ hourrah
 hui
 hue
 hum
+huit
 #################################
 #                                #
 #        I                        #
@@ -319,6 +327,9 @@ moindre
 moins
 mon
 moyennant
+mille
+million
+milliard
 #################################
 #                                #
 #        N                        #
@@ -340,6 +351,7 @@ nous
 nul
 nulle
 nullement
+neuf
 #################################
 #                                #
 #        O                        #
@@ -359,6 +371,7 @@ or
 outre
 o
 ouf
+onze
 #################################
 #                                #
 #        P                        #
@@ -377,6 +390,8 @@ partout
 pas
 patatras
 pendant
+personne
+personnes
 petit
 petits
 petite
@@ -405,6 +420,8 @@ pst
 puis
 puisqu
 puisque
+premier
+première
 #################################
 #                                #
 #        Q                        #
@@ -429,6 +446,10 @@ quiconque
 quoi
 quoique
 quoiqu
+quatorze
+quarante
+quatre
+quinze
 #################################
 #                                #
 #        R                        #
@@ -485,6 +506,10 @@ susdite
 susdits
 susdites
 suite
+sept
+seize
+six
+soixante
 #################################
 #                                #
 #        T                        #
@@ -524,6 +549,9 @@ travers
 très
 trop
 tu
+trois
+treize
+trente
 #################################
 #                                #
 #        U                        #
@@ -554,6 +582,7 @@ vôtres
 vous
 vraiment
 vraisemblablement
+vingt
 #################################
 #                                #
 #        Y                        #
@@ -568,6 +597,7 @@ youppie
 #################################
 z
 zut
+zéro
 
 ##################################
 

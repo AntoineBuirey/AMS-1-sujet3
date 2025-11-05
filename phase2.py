@@ -4,6 +4,7 @@ import argparse
 import os
 import json
 from typing import Any
+import string
 
 # External modules
 import nltk
@@ -16,7 +17,8 @@ from collections import defaultdict
 from utils import DebugFunc
 
 from word_type import (TokenType, guess_type_of_token, classify_token_with_context,
-                       MUST_BE_CONCATENATED, guess_noun_type, get_verb_data, Mood)
+                       MUST_BE_CONCATENATED, guess_noun_type, get_verb_data, Mood,
+                       identify_subject_for_pronoun)
 from verbs_engine import VerbData, mood_map_inv, tense_map_inv, pronoun_map_inv
 from standardizer import trim_punctuation, normalize_apostrophes
 from count_occurences import count_occurrences
@@ -32,7 +34,7 @@ DEMOTE_MAX_RATIO = 0.3       # if proper/(proper+nonproper) < 0.3 => demoted
 
 # Tokenization constants
 PAGE_BREAK_TOKEN = "__PAGE_BREAK__"
-PAGE_NUMBER_REGEX = r"\n� \d+ � \n"
+PAGE_NUMBER_REGEX = r"(?:\n� \d+ � \n)|(?:\n\n\n)"
 
 
 
@@ -63,12 +65,11 @@ def split_words_with_quote_dash(words : list[str]) -> list[str]:
     return result
     
 
-def mark_page_numbers(text: str) -> str:
+def split_pages(text: str) -> list[str]:
     """
     Mark page numbers in the text with a special token.
     """
-    # Use PAGE_BREAK_TOKEN as a placeholder for page breaks (pattern: \n� N � \n)
-    return re.sub(PAGE_NUMBER_REGEX, PAGE_BREAK_TOKEN, text)
+    return re.split(PAGE_NUMBER_REGEX, text)
 
 def remove_newlines(text: str) -> str:
     """
@@ -94,77 +95,18 @@ def is_all_caps_sentence(tokens: list[str]) -> bool:
     return sum(ch.isupper() for ch in letters) / len(letters) >= 0.85
 
 
-# @DebugFunc
-# def is_proper_noun(sentence : list[str], index : int) -> bool:
-    # """
-    # Check if a word in a sentence is a proper noun.
-    # A proper noun is defined as a word that starts with a capital letter,
-    # is not the first word of the sentence (unless it is the only word),
-    # is not a functional word (determiner, pronoun, adverb, etc.),
-    # and contains at least one letter.
-    # """
-    # word = sentence[index]
-    # if not word[0].isupper():
-    #     return False
-    # if index == 0:  # first word of the sentence and starts with a capital letter
-    #     if any(char in word for char in string.ascii_letters):  # contains at least one letter
-    #         return (
-    #             word.lower() not in get_fonctional_words()
-    #             and not is_pronoun(word)
-    #             and not is_adverbe(word)
-    #             and not is_determinant(word)
-    #             and not is_verb(word)
-    #         )
-    # else:
-    #     return True # not the first word of the sentence and starts with a capital letter
-    # return False
-
-
-
-def split_sentences(text: str) -> list[str]:
+def split_sentences(pages: list[str]) -> list[list[str]]:
     """
-    Split text into sentences with a regex tuned for noisy text (e.g., OCR):
-    - split at ., !, ? if preceded by at least two word/paren/quote chars
-    - split at ellipsis + space ("... "), at quotes, or at patterns like "- digit -"
+    Split text into sentences using NLTK's sent_tokenize.
     """
-    return re.split(r'(?<=[\w )\"]{2}[.!?])|\.\.\.\ +|\"|- \d -', text)
-
-def split_sentences_on_page_breaks(sentences: list[str]) -> list[str]:
-    """
-    When every other page is present, sentences may be cut by page breaks.
-    Detect and split around `__PAGE_BREAK__` so we can flag possibly incomplete sentences.
-    Ex:
-    ```
-    ["This is a sentence.__PAGE_BREAK__This is the continuation."]
-    ->
-    ["This is a sentence.__PAGE_BREAK__", "__PAGE_BREAK__This is the continuation."]
-    ```
-    """
-    result = []
-    for sentence in sentences:
-        if PAGE_BREAK_TOKEN in sentence:
-            parts = sentence.split(PAGE_BREAK_TOKEN)
-            for i, part in enumerate(parts):
-                if i == 0:
-                    if part:
-                        result.append(part + PAGE_BREAK_TOKEN)
-                    else:
-                        raise ValueError("Unexpected PAGE_BREAK_TOKEN at start of sentence")
-                elif i == len(parts) - 1:
-                    if part:
-                        result.append(PAGE_BREAK_TOKEN + part)
-                    else:
-                        raise ValueError("Unexpected PAGE_BREAK_TOKEN at end of sentence")
-                else:
-                    result.append(PAGE_BREAK_TOKEN + part + PAGE_BREAK_TOKEN)
-                    # this case should not happen, because it mean that the sentence is on more than two pages...
-        else:
-            result.append(sentence)
+    result: list[list[str]] = []
+    for page in pages:
+        sentences = sent_tokenize(page, language="french")
+        result.append(sentences)
     return result
 
 
-
-def load_text(input_file: str) -> list[str]:
+def load_text(input_file: str) -> list[list[str]]:
     """
     Read input file an return a list of sentences (not lines).
     """
@@ -174,41 +116,42 @@ def load_text(input_file: str) -> list[str]:
     # some preprocessing operations to simplify text parsing
     text = normalize_apostrophes(text)
 
-    text = mark_page_numbers(text)
-    sentences = split_sentences(text)
+    pages = split_pages(text)
+    sentences_by_pages = split_sentences(pages)
     
-    sentences = split_sentences_on_page_breaks(sentences)
-    print("[INFO] Loaded {} sentences from {}".format(len(sentences), input_file))
-    return sentences
+    nb_sentences = sum(len(sents) for sents in sentences_by_pages)
+    print("[INFO] Loaded {} sentences from {}".format(nb_sentences, input_file))
+    return sentences_by_pages
 
 
 # --------- PASS 0: sentence preparation ---------
-def prepare_sentences(sentences: list[str]) -> list[dict[str, int | str | bool | list[str]]]:
+def prepare_sentences(sentences_by_pages: list[list[str]]) -> list[dict[str, int | str | bool | list[str]]]:
     prepared = []
-    for i in range(len(sentences)):
-        maybe_incomplete = False
-        original_sentence = sentences[i]
-        if PAGE_BREAK_TOKEN in original_sentence:
-            maybe_incomplete = True
-            original_sentence = original_sentence.replace(PAGE_BREAK_TOKEN, "")
-        sentence = original_sentence.strip(" \n\t\r-()")
-        sentence = remove_newlines(sentence)
-        if sentence == "":
-            continue
+    for page_index, page_sentences in enumerate(sentences_by_pages):
+        for i in range(len(page_sentences)):
+            maybe_incomplete = False
+            original_sentence = page_sentences[i]
+            if i == 0 or (i == len(page_sentences) - 1 and original_sentence[-1] not in string.punctuation):
+                maybe_incomplete = True
+            sentence = original_sentence.strip(" \n\t\r-()")
+            sentence = remove_newlines(sentence)
+            if sentence == "":
+                continue
 
-        tokens = word_tokenize(sentence, language="french")
-        tokens = split_words_with_quote_dash(tokens)
-        tokens = [t for t in tokens if t.strip() != ""]
-        # tokens = [t.strip(string.punctuation) for t in tokens if t.strip(string.punctuation) != ""]
-        prepared.append({
-            "sentence_index": i,
-            "original_sentence": original_sentence,
-            "full_sentence": sentence,
-            "maybe_incomplete": maybe_incomplete,
-            "tokens": tokens,
-            # Pre-compute ALL-CAPS to tweak proper-noun detection later
-            "all_caps": is_all_caps_sentence(tokens)
-        })
+            tokens = word_tokenize(sentence, language="french")
+            tokens = split_words_with_quote_dash(tokens)
+            tokens = [t for t in tokens if t.strip() != ""]
+            # tokens = [t.strip(string.punctuation) for t in tokens if t.strip(string.punctuation) != ""]
+            prepared.append({
+                "sentence_index": i,
+                "original_sentence": original_sentence,
+                "full_sentence": sentence,
+                "maybe_incomplete": maybe_incomplete,
+                "page_index": page_index,
+                "tokens": tokens,
+                # Pre-compute ALL-CAPS to tweak proper-noun detection later
+                "all_caps": is_all_caps_sentence(tokens)
+            })
     return prepared
 
 # --------- PASS A: learn proper nouns from non-ALL-CAPS sentences ---------
@@ -309,7 +252,7 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                         "mood": mood_map_inv[verb_data.mood],
                         "tense": tense_map_inv[verb_data.tense],
                         "pronoun": pronoun_map_inv[verb_data.pronoun]
-                    }
+                    }                
                 
             else:
                 token_data : dict[str, int|str|Any] = {
@@ -335,6 +278,7 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                 "original_sentence": item["original_sentence"],
                 "full_sentence": item["full_sentence"],
                 "maybe_incomplete": item["maybe_incomplete"],
+                "page_index": item["page_index"],
                 "words": words_list_dict
             })
     return result
@@ -399,6 +343,31 @@ def merge_determiners_nouns(result: list[dict]) -> list[dict]:
     return result
 
 
+def create_link_table(result: list[dict]) -> list[list[str]]:
+    """
+    Create a link table between persons if they co-occur in the same sentence.
+    """
+    link_table = []
+    for sentence in result:
+        persons_in_sentence = [word["word"] for word in sentence["words"]
+                               if word["type"] in {TokenType.PROPER_NOUN.value, TokenType.COMMON_NOUN.value}
+                               and word.get("noun_type") == "person"]
+        for i in range(len(persons_in_sentence)):
+            for j in range(i + 1, len(persons_in_sentence)):
+                link_table.append([persons_in_sentence[i], persons_in_sentence[j]])
+    return link_table
+
+
+def save_link_table(link_table: list[list[str]], input_file: str):
+    output_file = os.path.join("output", os.path.basename(input_file))
+    output_file = output_file.replace(".txt", ".linktable.csv")
+
+    os.makedirs("output", exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as f_out:
+        for link in link_table:
+            f_out.write(f"{link[0]},{link[1]}\n")
+    print(f"Link table written to {output_file}")
+
 def main():
     parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
     parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
@@ -412,11 +381,13 @@ def main():
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Input file {input_file} not found.")
 
-    sentences = load_text(input_file)
-    prepared = prepare_sentences(sentences)
+    sentences_by_pages = load_text(input_file)
+    prepared = prepare_sentences(sentences_by_pages)
     token_counts = learn_proper_token_stats(prepared)
     promoted_data = compute_promotion_demotion(*token_counts)
     result = tag_sentence_tokens(prepared, *promoted_data)
+    
+    result = identify_subject_for_pronoun(result)
     
     result = merge_determiners_nouns(result)
     
@@ -425,6 +396,8 @@ def main():
         
     save_output(result, input_file)
     save_occurences(result, input_file)
+    link_table = create_link_table(result)
+    save_link_table(link_table, input_file)
 
     
 
