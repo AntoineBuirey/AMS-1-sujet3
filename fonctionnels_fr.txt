@@ -110,6 +110,10 @@ crac
 cric
 ça
 çà
+cent
+cents
+cinq
+cinquante
 #################################
 #                                #
 #        CH                       #
@@ -161,6 +165,9 @@ du
 dudit
 durant
 duquel
+deux
+dix
+douze
 #################################
 #                                #
 #        E                        #
@@ -231,6 +238,7 @@ hourrah
 hui
 hue
 hum
+huit
 #################################
 #                                #
 #        I                        #
@@ -319,6 +327,9 @@ moindre
 moins
 mon
 moyennant
+mille
+million
+milliard
 #################################
 #                                #
 #        N                        #
@@ -340,6 +351,7 @@ nous
 nul
 nulle
 nullement
+neuf
 #################################
 #                                #
 #        O                        #
@@ -359,6 +371,7 @@ or
 outre
 o
 ouf
+onze
 #################################
 #                                #
 #        P                        #
@@ -377,6 +390,8 @@ partout
 pas
 patatras
 pendant
+personne
+personnes
 petit
 petits
 petite
@@ -405,6 +420,8 @@ pst
 puis
 puisqu
 puisque
+premier
+première
 #################################
 #                                #
 #        Q                        #
@@ -429,6 +446,10 @@ quiconque
 quoi
 quoique
 quoiqu
+quatorze
+quarante
+quatre
+quinze
 #################################
 #                                #
 #        R                        #
@@ -485,6 +506,10 @@ susdite
 susdits
 susdites
 suite
+sept
+seize
+six
+soixante
 #################################
 #                                #
 #        T                        #
@@ -524,6 +549,9 @@ travers
 très
 trop
 tu
+trois
+treize
+trente
 #################################
 #                                #
 #        U                        #
@@ -554,6 +582,7 @@ vôtres
 vous
 vraiment
 vraisemblablement
+vingt
 #################################
 #                                #
 #        Y                        #
@@ -568,6 +597,7 @@ youppie
 #################################
 z
 zut
+zéro
 
 ##################################
 
@@ -578,290 +608,3 @@ numéro
 deux
 et_al
 exemple
-
-#---------------------------
-#	DIRE
-#---------------------------
-dire
-disait
-disons
-dit
-#---------------------------
-#	ETRE
-#---------------------------
-être
-été
-étée
-étées
-étés
-étant
-étante
-étants
-étantes
-suis
-es
-est
-sommes
-êtes
-sont
-serai
-seras
-sera
-serons
-serez
-seront
-serais
-serait
-serions
-seriez
-seraient
-étais
-était
-étions
-étiez
-étaient
-fus
-fut
-fûmes
-fûtes
-furent
-sois
-soit
-soyons
-soyez
-soient
-fusse
-fusses
-fût
-fussions
-fussiez
-fussent
-#---------------------------
-#	AVOIR
-#---------------------------
-avoir
-a
-ayant
-ayante
-ayantes
-ayants
-eu
-eue
-eues
-eus
-ai
-as
-avons
-avez
-ont
-aurai
-auras
-aura
-aurons
-aurez
-auront
-aurais
-aurait
-aurions
-auriez
-auraient
-avais
-avait
-avions
-aviez
-avaient
-eut
-eûmes
-eûtes
-eurent
-aie
-aies
-ait
-ayons
-ayez
-aient
-eusse
-eusses
-eût
-eussions
-eussiez
-eussent
-#---------------------------
-#	FALLOIR
-#---------------------------
-falloir
-faut
-fallait
-fallut
-faudra
-fallu
-faille
-fallût
-faudrait
-#---------------------------
-#	DEVOIR
-#---------------------------
-devoir
-devaient
-devais
-devait
-devant
-devez
-deviez
-devions
-devons
-devra
-devrai
-devraient
-devrais
-devrait
-devras
-devrez
-devriez
-devrions
-devrons
-devront
-dois
-doit
-doive
-doivent
-doives
-dû
-dûmes
-durent
-dus
-dusse
-dussent
-dusses
-dussiez
-dussions
-dut
-dût
-dûtes	 
-#---------------------------
-#	POUVOIR
-#---------------------------
-peut
-peuvent
-peux
-pourra
-pourrai
-pourraient
-pourrais
-pourrait
-pourras
-pourrez
-pourriez
-pourrions
-pourrons
-pourront
-pouvaient
-pouvais
-pouvait
-pouvant
-pouvez
-pouviez
-pouvions
-pouvons
-pu
-puis
-puisse
-puissent
-puisses
-puissiez
-puissions
-pûmes
-purent
-pus
-pusse
-pussent
-pusses
-pussiez
-pussions
-put
-pût
-pûtes
-
-#---------------------------
-#	VOULOIR
-#---------------------------
-veuille
-veuillent
-veuilles
-veuillez  
-veulent
-veut
-veux
-voudra
-voudrai
-voudraient
-voudrais
-voudrait
-voudras
-voudrez
-voudriez
-voudrions
-voudrons
-voudront
-voulaient
-voulais
-voulait
-voulant
-voulez
-vouliez
-vouliez
-voulions
-voulons
-voulu
-voulûmes
-voulurent
-voulus
-voulusse
-voulussent
-voulusses
-voulussiez
-voulussions
-voulut
-voulût
-voulûtes
-
-#---------------------------
-#	FAIRE
-#---------------------------
-fais
-faisaient
-faisais
-faisait
-faisant
-faisiez
-faisions
-faisons
-fait
-faites
-fasse
-fassent
-fasses
-fassiez
-fassions
-fera
-ferai
-feraient
-ferais
-ferait
-feras
-ferez
-feriez
-ferions
-ferons
-feront
-fîmes
-firent
-fis
-fisse
-fissent
-fisses
-fissiez
-fissions
-fit
-fîtes
-font
