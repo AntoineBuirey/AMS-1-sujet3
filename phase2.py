@@ -22,8 +22,10 @@ from word_type import (TokenType, guess_type_of_token, classify_token_with_conte
                        MUST_BE_CONCATENATED, guess_noun_type, get_verb_data, Mood,
                        identify_subject_for_pronoun)
 from verbs_engine import VerbData, mood_map_inv, tense_map_inv, pronoun_map_inv
-from standardizer import trim_punctuation, normalize_apostrophes
+from standardizer import trim_punctuation, normalize_apostrophes, lowercase
 from count_occurences import count_occurrences
+from alias_resolution import resolve_aliases
+from create_graph import create_graph, save_img_graph
 
 # ===== Constants =====
 # Thresholds for promotion/demotion of proper-noun candidates
@@ -359,15 +361,15 @@ def create_link_table(result: list[dict]) -> list[list[str]]:
     return link_table
 
 
-def save_link_table(link_table: list[list[str]], input_file: str):
-    output_file = os.path.join("output", os.path.basename(input_file))
-    output_file = output_file.replace(".txt", ".linktable.csv")
+# def save_link_table(link_table: list[list[str]], input_file: str):
+#     output_file = os.path.join("output", os.path.basename(input_file))
+#     output_file = output_file.replace(".txt", ".linktable.csv")
 
-    os.makedirs("output", exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f_out:
-        for link in link_table:
-            f_out.write(f"{link[0]},{link[1]}\n")
-    print(f"Link table written to {output_file}")
+#     os.makedirs("output", exist_ok=True)
+#     with open(output_file, "w", encoding="utf-8") as f_out:
+#         for link in link_table:
+#             f_out.write(f"{link[0]},{link[1]}\n")
+#     print(f"Link table written to {output_file}")
 
 def main():
     parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
@@ -398,17 +400,27 @@ def main():
     
     word_count = count_occurrences(result)
     
+    aliases = resolve_aliases(list(word_count.keys()))
+    link_table = build_links_file(
+        input_file,
+        list(word_count.keys()),
+        aggregated=True,   
+        window=50,
+        min_count=1
+    )
+    
+    aliases = lowercase(aliases)
+    link_table = lowercase(link_table)
+    
+    graph = create_graph(aliases, link_table)
+    
     save_output(result, input_file)
     save_occurences(word_count, input_file)
-    link_table = create_link_table(result)
-    save_link_table(link_table, input_file)
-    build_links_file(
-    input_file,
-    aggregated=True,   
-    window=50,
-    min_count=1
-)
 
+    # save_link_table(link_table, input_file)
+
+    graph_img_path = os.path.join("output", os.path.basename(input_file)).replace(".txt", ".graph.png")
+    save_img_graph(graph, graph_img_path)
     
 
 

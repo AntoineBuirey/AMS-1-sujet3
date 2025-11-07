@@ -402,8 +402,8 @@ def get_verb_data(verb: str, words_list_dict, position : int) -> VerbData:
                 if filtered:
                     return filtered[0]
         # If still ambiguous, return the first candidate
-        print(f"Warning: Ambiguous verb '{verb}' with multiple candidates. Returning the first one.")
-        print(f"Candidates:\n\t{"\n\t".join(str(c) for c in candidates)}")
+        #! print(f"Warning: Ambiguous verb '{verb}' with multiple candidates. Returning the first one.")
+        #! print(f"Candidates:\n\t{"\n\t".join(str(c) for c in candidates)}")
         return candidates[0]
 
 

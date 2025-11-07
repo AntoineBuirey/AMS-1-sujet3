@@ -198,22 +198,23 @@ def canonicalize_links(raw_links: List[Tuple[str, str]],
             A, B = B, A
         agg[(A, B)] += 1
     return agg
-def load_wordcount(file_path: str) -> list[str]:
-    """Charger la liste des personnages depuis le fichier JSON."""
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return list(data.keys())
+# def load_wordcount(file_path: str) -> list[str]:
+#     """Charger la liste des personnages depuis le fichier JSON."""
+#     with open(file_path, "r", encoding="utf-8") as f:
+#         data = json.load(f)
+#     return list(data.keys())
 
 
 def build_links_file(
     input_file: str,
+    characters:List[str],
     *,
     window: int = 25,
     aggregated: bool = False,
     min_count: int = 1,
     directed: bool = False,
     unique_per_window: bool = True,
-) -> str:
+) -> List[Tuple[str, str, int]]:
     """
     Génère le fichier de liens (brut ou agrégé) dans output/.
     Identique au main d'avant, mais réutilisable.
@@ -222,14 +223,14 @@ def build_links_file(
         raise FileNotFoundError(f"Fichier texte {input_file} introuvable.")
 
     prefix = os.path.splitext(os.path.basename(input_file))[0]
-    wordcount_file = f"output/{prefix}.wordcount.json"
-    if not os.path.exists(wordcount_file):
-        raise FileNotFoundError(f"Fichier JSON {wordcount_file} introuvable.")
+    # wordcount_file = f"output/{prefix}.wordcount.json"
+    # if not os.path.exists(wordcount_file):
+    #     raise FileNotFoundError(f"Fichier JSON {wordcount_file} introuvable.")
 
     # Charger texte + personnages
     with open(input_file, "r", encoding="utf-8") as f:
         text = f.read()
-    characters = load_wordcount(wordcount_file)
+    # characters = load_wordcount(wordcount_file)
 
     # Tokens + formes multi-mots
     tokens = tokenize_text(text)
@@ -246,6 +247,8 @@ def build_links_file(
     alias_map = infer_alias_map(characters, raw_links)
     pairs = canonicalize_links(raw_links, alias_map, undirected=not directed)
 
+    result = []
+
     # Écriture dans output/
     os.makedirs("output", exist_ok=True)
     out = f"output/{prefix}_links.csv" if not aggregated else f"output/{prefix}_links_aggregated.csv"
@@ -255,10 +258,12 @@ def build_links_file(
             for (a, b), c in pairs.most_common():
                 if c >= min_count:
                     f.write(f"{a},{b},{c}\n")
+                    result.append((a, b, c))
         else:
             for (a, b), c in pairs.items():
                 for _ in range(c):
                     f.write(f"{a},{b}\n")
+                    result.append((a, b))
 
     print(f"✅ Liens sauvegardés dans {out}")
-    return out
+    return result
