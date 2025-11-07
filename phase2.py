@@ -5,6 +5,8 @@ import os
 import json
 from typing import Any
 import string
+from lien_personnage import build_links_file
+ 
 
 # External modules
 import nltk
@@ -400,6 +402,12 @@ def main():
     save_occurences(word_count, input_file)
     link_table = create_link_table(result)
     save_link_table(link_table, input_file)
+    build_links_file(
+    input_file,
+    aggregated=True,   
+    window=50,
+    min_count=1
+)
 
     
 

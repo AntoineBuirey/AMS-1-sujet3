@@ -108,9 +108,9 @@ def add_dominant_alias_by_ratio(
     pair_counter: Counter,
     characters: Optional[List[str]] = None,
     *,
-    ratio_thresh: float = 0.50,   # plus permissif
+    ratio_thresh: float = 0.50,   
     min_count: int = 3,
-    gap: int = 2                  # ou top >= second + gap
+    gap: int = 2                 
 ) -> None:
     """
     Mappe automatiquement un nom vers son partenaire majoritaire.
@@ -171,10 +171,8 @@ def infer_alias_map(characters: List[str], raw_links: List[Tuple[str, str]]) -> 
         if c_best > 0 and (len(scored) == 1 or c_best >= 2 * scored[1][1]):
             alias[s] = alias.get(mw_best, mw_best)
 
-    # 3) paires dominantes (attrape 'Le Commissaire' -> 'Julius Enderby', 'Lije' -> 'Baley', etc.)
     add_dominant_alias_by_ratio(alias, pair_counter, characters, ratio_thresh=0.50, min_count=3, gap=2)
 
-    # Résolution transitive
     def find_canon(x: str) -> str:
         seen = set()
         while x in alias and alias[x] != x and alias[x] not in seen:
@@ -200,24 +198,26 @@ def canonicalize_links(raw_links: List[Tuple[str, str]],
             A, B = B, A
         agg[(A, B)] += 1
     return agg
-
-# ------------------ I/O ------------------
-def load_wordcount(file_path: str) -> List[str]:
+def load_wordcount(file_path: str) -> list[str]:
+    """Charger la liste des personnages depuis le fichier JSON."""
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return list(data.keys())
 
-def main():
-    parser = argparse.ArgumentParser(description="Trouver les liens entre personnages (auto-alias par cooccurrence).")
-    parser.add_argument("input_file", type=str)
-    parser.add_argument("--window", type=int, default=25)
-    parser.add_argument("--aggregated", action="store_true")
-    parser.add_argument("--min-count", type=int, default=1)
-    parser.add_argument("--directed", action="store_true")
-    parser.add_argument("--no-unique-per-window", action="store_true")
-    args = parser.parse_args()
 
-    input_file = args.input_file
+def build_links_file(
+    input_file: str,
+    *,
+    window: int = 25,
+    aggregated: bool = False,
+    min_count: int = 1,
+    directed: bool = False,
+    unique_per_window: bool = True,
+) -> str:
+    """
+    Génère le fichier de liens (brut ou agrégé) dans output/.
+    Identique au main d'avant, mais réutilisable.
+    """
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Fichier texte {input_file} introuvable.")
 
@@ -226,35 +226,39 @@ def main():
     if not os.path.exists(wordcount_file):
         raise FileNotFoundError(f"Fichier JSON {wordcount_file} introuvable.")
 
+    # Charger texte + personnages
     with open(input_file, "r", encoding="utf-8") as f:
         text = f.read()
     characters = load_wordcount(wordcount_file)
+
+    # Tokens + formes multi-mots
     tokens = tokenize_text(text)
     name_to_parts = prepare_character_forms(characters)
 
+    # Liens bruts
     raw_links = build_raw_links(
         characters, tokens, name_to_parts,
-        window=args.window,
-        undirected=not args.directed,
-        unique_per_window=not args.no_unique_per_window
+        window=window,
+        undirected=not directed,
+        unique_per_window=unique_per_window
     )
 
     alias_map = infer_alias_map(characters, raw_links)
-    pairs = canonicalize_links(raw_links, alias_map, undirected=not args.directed)
+    pairs = canonicalize_links(raw_links, alias_map, undirected=not directed)
 
-    out = f"output/{prefix}_links.csv" if not args.aggregated else f"output/{prefix}_links_aggregated.csv"
+    # Écriture dans output/
+    os.makedirs("output", exist_ok=True)
+    out = f"output/{prefix}_links.csv" if not aggregated else f"output/{prefix}_links_aggregated.csv"
     with open(out, "w", encoding="utf-8") as f:
-        if args.aggregated:
+        if aggregated:
             f.write("source,target,count\n")
             for (a, b), c in pairs.most_common():
-                if c >= args.min_count:
+                if c >= min_count:
                     f.write(f"{a},{b},{c}\n")
         else:
             for (a, b), c in pairs.items():
                 for _ in range(c):
                     f.write(f"{a},{b}\n")
 
-    print(f"Liens sauvegardés dans {out}")
-
-if __name__ == "__main__":
-    main()
+    print(f"✅ Liens sauvegardés dans {out}")
+    return out
