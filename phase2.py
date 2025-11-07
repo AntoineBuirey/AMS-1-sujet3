@@ -299,12 +299,11 @@ def save_output(result: list[dict], input_file: str):
     print(f"Tokenized sentences written to {output_file}")
 
 
-def save_occurences(result: list[dict], input_file: str):
+def save_occurences(word_count: dict[str, int], input_file: str):
     output_file = os.path.join("output", os.path.basename(input_file))
     output_file = output_file.replace(".txt", ".wordcount.json")
 
     os.makedirs("output", exist_ok=True)
-    word_count = count_occurrences(result)
     with open(output_file, "w", encoding="utf-8") as f_out:
         json.dump(word_count, f_out, ensure_ascii=False, indent=4)
     print(f"Word counts written to {output_file}")    
@@ -393,9 +392,12 @@ def main():
     
     if args.proper:
         result = filter_person_nouns_only(result, keep_only_proper=True)
-        
+    
+    
+    word_count = count_occurrences(result)
+    
     save_output(result, input_file)
-    save_occurences(result, input_file)
+    save_occurences(word_count, input_file)
     link_table = create_link_table(result)
     save_link_table(link_table, input_file)
 

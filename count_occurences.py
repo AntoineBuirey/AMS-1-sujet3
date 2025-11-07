@@ -3,7 +3,7 @@ import argparse
 from word_type import TokenType, NounType
 
     
-def count_occurrences(data):
+def count_occurrences(data) -> dict[str, int]:
     word_count = {}
     for sentence in data:
         for word_info in sentence["words"]:
