@@ -1,3 +1,5 @@
+import os
+import json
 
 class Cache:
     """
@@ -22,22 +24,13 @@ class Cache:
         return result
 
 
-class DebugFunc:
-    """
-    Decorator that prints the function name, its arguments, and its return value when called.
-    In order to enable/disable debug mode, set DebugFunc._debug = True/False
-    Usage:
-    @DebugFunc
-    def my_function(args):
-        ...
-    """
-    _debug = False
-    def __init__(self, func):
-        self.func = func
+def get_output_dir(code : str, chapter : int) -> str:
+    output_dir = f"output/{code}/{chapter:02d}/"
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
 
-    def __call__(self, *args, **kwargs):
-        if not DebugFunc._debug:
-            return self.func(*args, **kwargs)
-        result = self.func(*args, **kwargs)
-        print(f"Function {self.func.__name__} called with args: {args}, kwargs: {kwargs}. Result: {result}")
-        return result
+def save_structure_data(data : list|dict, output_dir : str, type : str):
+    output_file = f"{output_dir}{type}.json"
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    print(f"[INFO] Saved {type} data to {output_file}")

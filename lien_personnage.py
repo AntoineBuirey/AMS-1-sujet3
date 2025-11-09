@@ -1,7 +1,4 @@
-# links.py
 import re
-import json
-import argparse
 from collections import Counter, defaultdict
 import os
 import unicodedata
@@ -106,7 +103,6 @@ def pretty_case(name: str) -> str:
 def add_dominant_alias_by_ratio(
     alias: Dict[str, str],
     pair_counter: Counter,
-    characters: Optional[List[str]] = None,
     *,
     ratio_thresh: float = 0.50,   
     min_count: int = 3,
@@ -171,7 +167,7 @@ def infer_alias_map(characters: List[str], raw_links: List[Tuple[str, str]]) -> 
         if c_best > 0 and (len(scored) == 1 or c_best >= 2 * scored[1][1]):
             alias[s] = alias.get(mw_best, mw_best)
 
-    add_dominant_alias_by_ratio(alias, pair_counter, characters, ratio_thresh=0.50, min_count=3, gap=2)
+    add_dominant_alias_by_ratio(alias, pair_counter, ratio_thresh=0.50, min_count=3, gap=2)
 
     def find_canon(x: str) -> str:
         seen = set()
@@ -249,21 +245,13 @@ def build_links_file(
 
     result = []
 
-    # Écriture dans output/
-    os.makedirs("output", exist_ok=True)
-    out = f"output/{prefix}_links.csv" if not aggregated else f"output/{prefix}_links_aggregated.csv"
-    with open(out, "w", encoding="utf-8") as f:
-        if aggregated:
-            f.write("source,target,count\n")
-            for (a, b), c in pairs.most_common():
-                if c >= min_count:
-                    f.write(f"{a},{b},{c}\n")
-                    result.append((a, b, c))
-        else:
-            for (a, b), c in pairs.items():
-                for _ in range(c):
-                    f.write(f"{a},{b}\n")
-                    result.append((a, b))
+    if aggregated:
+        for (a, b), c in pairs.most_common():
+            if c >= min_count:
+                result.append((a, b, c))
+    else:
+        for (a, b), c in pairs.items():
+            for _ in range(c):
+                result.append((a, b))
 
-    print(f"✅ Liens sauvegardés dans {out}")
     return result

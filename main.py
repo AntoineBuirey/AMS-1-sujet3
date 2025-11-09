@@ -5,18 +5,17 @@ import os
 import json
 from typing import Any
 import string
-from lien_personnage import build_links_file
  
 
 # External modules
 import nltk
-nltk.download('punkt')
-nltk.download('punkt_tab') 
+def init_nltk():
+    nltk.download('punkt')
+    nltk.download('punkt_tab') 
 
 from nltk.tokenize import sent_tokenize, word_tokenize
 from collections import defaultdict
 # Local modules
-from utils import DebugFunc
 
 from word_type import (TokenType, guess_type_of_token, classify_token_with_context,
                        MUST_BE_CONCATENATED, guess_noun_type, get_verb_data, Mood,
@@ -26,6 +25,8 @@ from standardizer import trim_punctuation, normalize_apostrophes, lowercase
 from count_occurences import count_occurrences
 from alias_resolution import resolve_aliases
 from create_graph import create_graph, save_img_graph
+from lien_personnage import build_links_file
+from utils import save_structure_data, get_output_dir
 
 # ===== Constants =====
 # Thresholds for promotion/demotion of proper-noun candidates
@@ -265,8 +266,9 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                     "type": token_type.value
                 }
                 if token_type in {TokenType.PROPER_NOUN, TokenType.COMMON_NOUN}:
-                    noun_type = guess_noun_type(tokens, words_list_dict, j, token_type)
+                    noun_type, reason = guess_noun_type(tokens, words_list_dict, j, token_type)
                     token_data["noun_type"] = noun_type.value
+                    token_data["noun_type_reason"] = reason
                 elif token_type == TokenType.VERB:
                     verb_data = get_verb_data(tok, words_list_dict, j)
                     token_data['verb_data'] = {
@@ -293,24 +295,24 @@ def filter_person_nouns_only(result: list[dict], keep_only_proper: bool) -> list
     result = [sentence for sentence in result if sentence["words"]]
     return result
 
-def save_output(result: list[dict], input_file: str):
-    output_file = os.path.join("output", os.path.basename(input_file))
-    output_file = output_file.replace(".txt", ".parsed.json")
+# def save_output(result: list[dict], input_file: str):
+#     output_file = os.path.join("output", os.path.basename(input_file))
+#     output_file = output_file.replace(".txt", ".parsed.json")
 
-    os.makedirs("output", exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f_out:
-        json.dump(result, f_out, ensure_ascii=False, indent=4)
-    print(f"Tokenized sentences written to {output_file}")
+#     os.makedirs("output", exist_ok=True)
+#     with open(output_file, "w", encoding="utf-8") as f_out:
+#         json.dump(result, f_out, ensure_ascii=False, indent=4)
+#     print(f"Tokenized sentences written to {output_file}")
 
 
-def save_occurences(word_count: dict[str, int], input_file: str):
-    output_file = os.path.join("output", os.path.basename(input_file))
-    output_file = output_file.replace(".txt", ".wordcount.json")
+# def save_occurences(word_count: dict[str, int], input_file: str):
+#     output_file = os.path.join("output", os.path.basename(input_file))
+#     output_file = output_file.replace(".txt", ".wordcount.json")
 
-    os.makedirs("output", exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f_out:
-        json.dump(word_count, f_out, ensure_ascii=False, indent=4)
-    print(f"Word counts written to {output_file}")    
+#     os.makedirs("output", exist_ok=True)
+#     with open(output_file, "w", encoding="utf-8") as f_out:
+#         json.dump(word_count, f_out, ensure_ascii=False, indent=4)
+#     print(f"Word counts written to {output_file}")    
 
 
 def merge_determiners_nouns(result: list[dict]) -> list[dict]:
@@ -336,7 +338,8 @@ def merge_determiners_nouns(result: list[dict]) -> list[dict]:
                     "word": word_info["word"] + " " + words[i + 1]["word"],
                     "position": word_info["position"],
                     "type": TokenType.COMMON_NOUN.value,
-                    "noun_type": "person"
+                    "noun_type": "person",
+                    "noun_type_reason": f"merged determiner with person common noun (from '{words[i + 1]['noun_type_reason']}')"
                 }
                 merged_words.append(merged_word)
                 skip_next = True
@@ -371,18 +374,26 @@ def create_link_table(result: list[dict]) -> list[list[str]]:
 #             f_out.write(f"{link[0]},{link[1]}\n")
 #     print(f"Link table written to {output_file}")
 
-def main():
-    parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
-    parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
-    parser.add_argument("--proper", "-p", action="store_true", help="Only keep proper nouns.")
-    parser.add_argument("--debug", "-d", action="store_true", help="Enable debug mode.")
-    args = parser.parse_args()
 
-    DebugFunc._debug = args.debug
-
-    input_file = args.input_file
+def get_book_chapter(input_file: str) -> tuple[str, int]:
+    """
+    Extract book code and chapter number from input file path.
+    Assumes input file is named like 'code_chapter.txt', e.g. 'paf.chapter_12.txt'.
+    """
+    
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Input file {input_file} not found.")
+    
+    base_name = os.path.basename(input_file)
+    match = re.match(r"([a-zA-Z]+)[._-]chapter[_-](\d+)\.txt$", base_name)
+    if not match:
+        raise ValueError(f"Input file name {base_name} does not match expected pattern '[code].chapter_[number].txt'")
+    book_code = match.group(1)
+    chapter_number = int(match.group(2))
+    return book_code, chapter_number
+    
+def build_characters_graph(input_file: str, save_intermediate: bool = False, save_graph_image : bool = False, show_vertices_labels : bool = False) -> str:
+    book_code, chapter_number = get_book_chapter(input_file)
 
     sentences_by_pages = load_text(input_file)
     prepared = prepare_sentences(sentences_by_pages)
@@ -393,10 +404,6 @@ def main():
     result = identify_subject_for_pronoun(result)
     
     result = merge_determiners_nouns(result)
-    
-    if args.proper:
-        result = filter_person_nouns_only(result, keep_only_proper=True)
-    
     
     word_count = count_occurrences(result)
     
@@ -414,13 +421,60 @@ def main():
     
     graph = create_graph(aliases, link_table)
     
-    save_output(result, input_file)
-    save_occurences(word_count, input_file)
+    output_dir = get_output_dir(book_code, chapter_number)
+    
+    if save_intermediate:
+        save_structure_data(result, output_dir, "parsed_sentences")
+        save_structure_data(word_count, output_dir, "word_count")
+        save_structure_data(aliases, output_dir, "aliases")
+        save_structure_data(link_table, output_dir, "link_table")
+    if save_graph_image:
+        save_img_graph(graph, os.path.join(output_dir, "graph.png"), show_vertices_labels=show_vertices_labels)
 
-    # save_link_table(link_table, input_file)
+    return graph
 
-    graph_img_path = os.path.join("output", os.path.basename(input_file)).replace(".txt", ".graph.png")
-    save_img_graph(graph, graph_img_path)
+
+def is_filename_well_formed(filename: str) -> bool:
+    base_name = os.path.basename(filename)
+    match = re.match(r"([a-zA-Z]+)[._-]chapter[_-](\d+)\.txt$", base_name)
+    return match is not None
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.", add_help=True)
+    parser.add_argument("--text", "-t", type=str, help="Path to the input text file.", dest="input_file", action="append")
+    parser.add_argument("--dir", "-d", type=str, help="Path to a folder containing text to process.", dest="input_dir", action="append")
+    parser.add_argument("--save-intermediate", "-i", action="store_true", help="Save intermediate data structures to output directory.")
+    parser.add_argument("--save-graph-image", "-g", action="store_true", help="Save graph image to output directory.")
+    parser.add_argument("--show-vertices-labels", "-l", action="store_true", help="Show vertex labels on the saved graph image. Have no effect if --save-graph-image is not set.")
+    args = parser.parse_args()
+    
+    init_nltk() # differ nltk initialization to after parsing arguments, to avoid unnecessary downloads if help is requested
+    
+    if not args.input_file and not args.input_dir:
+        print("no input files or directories provided. taking texts from ./text_dataset/ by default.")
+        args.input_dir = ["./text_dataset/"]
+
+    input_files = args.input_file if args.input_file else []
+    if args.input_dir:
+        for input_dir in args.input_dir:
+            for fname in os.listdir(input_dir):
+                if is_filename_well_formed(fname):
+                    input_files.append(os.path.join(input_dir, fname))
+                else:
+                    print(f"[WARNING] Skipping file with unexpected name format: {fname}")
+    for input_file in input_files:
+        print(f"[INFO] Processing file: {input_file}")
+        graphml = build_characters_graph(input_file,
+                                        save_intermediate=args.save_intermediate,
+                                        save_graph_image=args.save_graph_image,
+                                        show_vertices_labels=args.show_vertices_labels) 
+        book_code, chapter_number = get_book_chapter(input_file)
+        output_dir = get_output_dir(book_code, chapter_number)
+        output_file = os.path.join(output_dir, "graph.graphml")
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(graphml)
+        print(f"[INFO] GraphML saved to: {output_file}")
     
 
 

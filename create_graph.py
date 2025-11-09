@@ -37,7 +37,7 @@ def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) 
     return graphml
 
 
-def save_img_graph(graphml: str, output_path: str):
+def save_img_graph(graphml: str, output_path: str, show_vertices_labels: bool = False):
     G = nx.parse_graphml(graphml)
     plt.figure(figsize=(50, 40))
     pos = nx.spring_layout(G, k=0.5, iterations=50)
@@ -48,9 +48,14 @@ def save_img_graph(graphml: str, output_path: str):
     
     nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', 
             node_size=5000, font_size=20, width=edge_widths)
+    
+    if show_vertices_labels:
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=weights, font_size=15)
+    
     plt.title("Character Graph")
     
     plt.savefig(output_path)
+    plt.close()
     
     
 
