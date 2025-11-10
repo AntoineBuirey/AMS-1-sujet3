@@ -1,5 +1,3 @@
-import json
-import argparse
 from word_type import TokenType, NounType
 
     
@@ -18,22 +16,3 @@ def count_occurrences(data) -> dict[str, int]:
 
     # Sort by decreasing count
     return  dict(sorted(word_count.items(), key=lambda item: item[1], reverse=True))
-
-def main():
-    parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.")
-    parser.add_argument("input_file", type=str, help="Path to the input text file. Must be in the text_dataset folder.")
-    args = parser.parse_args()
-
-    with open(f"{args.input_file}", "r", encoding="utf-8") as f:
-        data = json.load(f)
-        
-    word_count = count_occurrences(data)
-
-    with open(f"{args.input_file.replace('.parsed.json', '.wordcount.json')}", "w", encoding="utf-8") as f:
-        json.dump(word_count, f, ensure_ascii=False, indent=4)
-    print(f"Word counts written to output/{args.input_file.replace('.parsed.json', '.wordcount.json')}")
-
-
-
-if __name__ == "__main__":
-    main()

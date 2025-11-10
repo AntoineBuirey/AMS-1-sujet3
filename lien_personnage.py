@@ -2,7 +2,7 @@ import re
 from collections import Counter, defaultdict
 import os
 import unicodedata
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 
 # ------------------ tokenisation/normalisation ------------------
 PUNCT = ".,;:!?\"'()[]{}<>«»“”‘’—-–…"

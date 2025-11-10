@@ -2,7 +2,7 @@
 import re
 import argparse
 import os
-import json
+import datetime
 from typing import Any
 import string
  
@@ -10,11 +10,14 @@ import string
 # External modules
 import nltk
 def init_nltk():
-    nltk.download('punkt')
-    nltk.download('punkt_tab') 
+    Logger.info("Initializing NLTK and downloading required resources...")
+    nltk.download('punkt', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
+    Logger.info("NLTK initialization complete.")
 
 from nltk.tokenize import sent_tokenize, word_tokenize
 from collections import defaultdict
+from gamuLogger import Logger, config_argparse, config_logger
 # Local modules
 
 from word_type import (TokenType, guess_type_of_token, classify_token_with_context,
@@ -26,7 +29,12 @@ from count_occurences import count_occurrences
 from alias_resolution import resolve_aliases
 from create_graph import create_graph, save_img_graph
 from lien_personnage import build_links_file
-from utils import save_structure_data, get_output_dir
+from utils import save_structure_data, get_output_dir, append_to_file
+
+
+# logger setup
+Logger.set_module("main")
+
 
 # ===== Constants =====
 # Thresholds for promotion/demotion of proper-noun candidates
@@ -125,7 +133,7 @@ def load_text(input_file: str) -> list[list[str]]:
     sentences_by_pages = split_sentences(pages)
     
     nb_sentences = sum(len(sents) for sents in sentences_by_pages)
-    print("[INFO] Loaded {} sentences from {}".format(nb_sentences, input_file))
+    Logger.info(f"Loaded {nb_sentences} sentences from {input_file}")
     return sentences_by_pages
 
 
@@ -211,7 +219,7 @@ def compute_promotion_demotion(proper_token_count, nonproper_lower_count, proper
             if ratio < DEMOTE_MAX_RATIO:
                 auto_demote_tokens.add(w)
 
-    print(f"[INFO] Auto-demoted: {len(auto_demote_tokens)} tokens, e.g.: {list(auto_demote_tokens)[:10]}")
+    Logger.info(f"Auto-demoted: {len(auto_demote_tokens)} tokens\nfirst 10: {list(auto_demote_tokens)[:10]}")
 
     promoted_bigrams = {bg for bg, c in proper_bigram_count.items() if c >= PROMOTE_MIN_BIGRAM}
     return promoted_tokens, promoted_bigrams, auto_demote_tokens
@@ -219,7 +227,7 @@ def compute_promotion_demotion(proper_token_count, nonproper_lower_count, proper
 
 
 # --------- PASS B: final tagging ---------
-def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]], promoted_tokens: set, promoted_bigrams: set, auto_demote_tokens: set) -> list[dict]:
+def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]], promoted_tokens: set, promoted_bigrams: set, auto_demote_tokens: set, store_unknow_verb : str|None = None) -> list[dict]:
     result = []
     for item in prepared:
         tokens = item["tokens"]
@@ -239,6 +247,8 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                 
                 if token_type == TokenType.VERB:
                     # since it's a concatenated verb, we need to update the verb data with the new one
+                    word = words_list_dict[-1]["word"]
+                    word = word.strip("-")
                     try:
                         verb_data = get_verb_data(words_list_dict[-1]["word"], words_list_dict, j)
                     except ValueError as e:
@@ -250,7 +260,10 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                             "position": j,
                             "type": token_type.value
                         })
-                        print(f"Warning: Could not find verb data for concatenated verb '{words_list_dict[-1]['word']}'. Marking it as ADJECTIVE.")
+                        Logger.warning(f"Could not find verb data for concatenated verb '{words_list_dict[-1]['word']}'. Marking it as ADJECTIVE.")
+                        if store_unknow_verb:
+                            append_to_file(store_unknow_verb, words_list_dict[-1]['word'])
+                            Logger.debug(f"Stored unknown verb '{words_list_dict[-1]['word']}' to {store_unknow_verb}")
                         continue
                     words_list_dict[-1]['verb_data'] = {
                         "infinitive": verb_data.infinitive,
@@ -294,26 +307,6 @@ def filter_person_nouns_only(result: list[dict], keep_only_proper: bool) -> list
         sentence["words"] = [word for word in sentence["words"] if (word["type"] in {TokenType.PROPER_NOUN.value, TokenType.COMMON_NOUN.value} and word.get("noun_type") == "person")]
     result = [sentence for sentence in result if sentence["words"]]
     return result
-
-# def save_output(result: list[dict], input_file: str):
-#     output_file = os.path.join("output", os.path.basename(input_file))
-#     output_file = output_file.replace(".txt", ".parsed.json")
-
-#     os.makedirs("output", exist_ok=True)
-#     with open(output_file, "w", encoding="utf-8") as f_out:
-#         json.dump(result, f_out, ensure_ascii=False, indent=4)
-#     print(f"Tokenized sentences written to {output_file}")
-
-
-# def save_occurences(word_count: dict[str, int], input_file: str):
-#     output_file = os.path.join("output", os.path.basename(input_file))
-#     output_file = output_file.replace(".txt", ".wordcount.json")
-
-#     os.makedirs("output", exist_ok=True)
-#     with open(output_file, "w", encoding="utf-8") as f_out:
-#         json.dump(word_count, f_out, ensure_ascii=False, indent=4)
-#     print(f"Word counts written to {output_file}")    
-
 
 def merge_determiners_nouns(result: list[dict]) -> list[dict]:
     """
@@ -364,17 +357,6 @@ def create_link_table(result: list[dict]) -> list[list[str]]:
     return link_table
 
 
-# def save_link_table(link_table: list[list[str]], input_file: str):
-#     output_file = os.path.join("output", os.path.basename(input_file))
-#     output_file = output_file.replace(".txt", ".linktable.csv")
-
-#     os.makedirs("output", exist_ok=True)
-#     with open(output_file, "w", encoding="utf-8") as f_out:
-#         for link in link_table:
-#             f_out.write(f"{link[0]},{link[1]}\n")
-#     print(f"Link table written to {output_file}")
-
-
 def get_book_chapter(input_file: str) -> tuple[str, int]:
     """
     Extract book code and chapter number from input file path.
@@ -392,14 +374,19 @@ def get_book_chapter(input_file: str) -> tuple[str, int]:
     chapter_number = int(match.group(2))
     return book_code, chapter_number
     
-def build_characters_graph(input_file: str, save_intermediate: bool = False, save_graph_image : bool = False, show_vertices_labels : bool = False) -> str:
+def build_characters_graph(input_file: str,
+                           save_intermediate: bool = False,
+                           save_graph_image : bool = False,
+                           show_vertices_labels : bool = False,
+                           store_unknow_verb : str|None = None
+                           ) -> str:
     book_code, chapter_number = get_book_chapter(input_file)
 
     sentences_by_pages = load_text(input_file)
     prepared = prepare_sentences(sentences_by_pages)
     token_counts = learn_proper_token_stats(prepared)
     promoted_data = compute_promotion_demotion(*token_counts)
-    result = tag_sentence_tokens(prepared, *promoted_data)
+    result = tag_sentence_tokens(prepared, *promoted_data, store_unknow_verb)
     
     result = identify_subject_for_pronoun(result)
     
@@ -442,17 +429,21 @@ def is_filename_well_formed(filename: str) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.", add_help=True)
+    config_argparse(parser)
     parser.add_argument("--text", "-t", type=str, help="Path to the input text file.", dest="input_file", action="append")
     parser.add_argument("--dir", "-d", type=str, help="Path to a folder containing text to process.", dest="input_dir", action="append")
     parser.add_argument("--save-intermediate", "-i", action="store_true", help="Save intermediate data structures to output directory.")
     parser.add_argument("--save-graph-image", "-g", action="store_true", help="Save graph image to output directory.")
     parser.add_argument("--show-vertices-labels", "-l", action="store_true", help="Show vertex labels on the saved graph image. Have no effect if --save-graph-image is not set.")
+    parser.add_argument("--store-unknow-verb", "-u", help="Store unknown verbs encountered during tagging to 'output/unknown_verbs.txt'.", action="store_true")
     args = parser.parse_args()
+    
+    config_logger(args)
     
     init_nltk() # differ nltk initialization to after parsing arguments, to avoid unnecessary downloads if help is requested
     
     if not args.input_file and not args.input_dir:
-        print("no input files or directories provided. taking texts from ./text_dataset/ by default.")
+        Logger.warning("no input files or directories provided. taking texts from ./text_dataset/ by default.")
         args.input_dir = ["./text_dataset/"]
 
     input_files = args.input_file if args.input_file else []
@@ -462,19 +453,21 @@ def main():
                 if is_filename_well_formed(fname):
                     input_files.append(os.path.join(input_dir, fname))
                 else:
-                    print(f"[WARNING] Skipping file with unexpected name format: {fname}")
+                    Logger.warning(f"Skipping file with unexpected name format: {fname}")
     for input_file in input_files:
-        print(f"[INFO] Processing file: {input_file}")
+        Logger.info(f"Processing file: {input_file}")
         graphml = build_characters_graph(input_file,
                                         save_intermediate=args.save_intermediate,
                                         save_graph_image=args.save_graph_image,
-                                        show_vertices_labels=args.show_vertices_labels) 
+                                        show_vertices_labels=args.show_vertices_labels,
+                                        store_unknow_verb="output/unknown_verbs.txt" if args.store_unknow_verb else None
+                                        )
         book_code, chapter_number = get_book_chapter(input_file)
         output_dir = get_output_dir(book_code, chapter_number)
         output_file = os.path.join(output_dir, "graph.graphml")
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(graphml)
-        print(f"[INFO] GraphML saved to: {output_file}")
+        Logger.info(f"GraphML saved to: {output_file}")
     
 
 

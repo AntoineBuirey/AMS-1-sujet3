@@ -1,10 +1,15 @@
-from enum import StrEnum, Enum
+from enum import StrEnum
 import string
 from typing import Any
+import re
+
+from gamuLogger import Logger
+
 from verbs_engine import VerbTree, VerbData, Pronoun, pronoun_map, Mood, Tense
 from utils import Cache
-import re
 from standardizer import trim_punctuation
+
+Logger.set_module("word_type")
 
 verb_tree = VerbTree.load("verb.data")
 
@@ -415,8 +420,8 @@ def get_verb_data(verb: str, words_list_dict, position : int) -> VerbData:
                 if filtered:
                     return filtered[0]
         # If still ambiguous, return the first candidate
-        #! print(f"Warning: Ambiguous verb '{verb}' with multiple candidates. Returning the first one.")
-        #! print(f"Candidates:\n\t{"\n\t".join(str(c) for c in candidates)}")
+        Logger.debug(f"Ambiguous verb '{verb}' with multiple candidates. Returning the first one.")
+        Logger.trace(f"Candidates:\n\t{"\n\t".join(str(c) for c in candidates)}")
         return candidates[0]
 
 
@@ -484,7 +489,7 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
                     # return NounType.PERSON, "previous word is 3rd person past tense verb"
                     # check if there is no subject pronoun before the verb
                     has_subject_pronoun = False
-                    print(f"[DEBUG] Checking for subject pronoun before verb '{previous_word}' at index {index-1}")
+                    Logger.debug(f"Checking for subject pronoun before verb '{previous_word}' at index {index-1}")
                     # locate the verb in sentence_data (may be different from index-1 due to merged tokens)
                     verb_position_in_data = None
                     for i, word_data in enumerate(sentence_data):
@@ -500,7 +505,7 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
                                     pronoun = PRONOUN_MAP[pronoun_word]
                                     if pronoun == Pronoun.IL_ELLE_ON:
                                         has_subject_pronoun = True
-                                        print(f"[DEBUG] Found subject pronoun '{pronoun_word}' before verb '{previous_word}'")
+                                        Logger.debug(f"Found subject pronoun '{pronoun_word}' before verb '{previous_word}'")
                                         break
                             elif word_data["type"] not in [TokenType.DETERMINER, TokenType.ADVERB]:
                                 # stop searching if we hit a non-functional word

@@ -3,37 +3,12 @@ import re
 import json
 import tempfile
 import os
+from typing import TypeVar
 from verbs_engine import VerbTree, VerbData, mood_map, tense_map, pronoun_map
-
-LOG_FILE = "db_filling.log"
-CONFIG_FILE = "db_filling.config.json"
-
-b_print = __builtins__.print
-def print(*args, **kwargs):
-    b_print(*args, **kwargs)
-    with open(LOG_FILE, "a", encoding="utf-8") as logf:
-        b_print(*args, file=logf, **kwargs)
 
 client = genai.Client(api_key="AIzaSyCjmmCPI7RjpRRlxwCUEfs8BbZS1mbL8b8")
 
-
-def save_config(config: dict):
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=4, ensure_ascii=False)
-    
-def create_config():
-    save_config({
-        "infinitives_file": "infinitives.json",
-        "processed": [],
-        "skipped": [],
-    })
-
-def get_config() -> dict:
-    if not os.path.exists(CONFIG_FILE):
-        create_config()
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
+INFINITIVES_FILE = "missing_verbs.txt"
 
 PROMPT = """
 Génère une liste JSON (tableau de tableaux) contenant toutes les conjugaisons françaises du verbe '{verb}'.
@@ -49,13 +24,18 @@ Exemple : [['aime', 'aimer', 'indicatif', 'présent', 'je'], ...].
 """
 
 def generate_table(verb: str) -> list[list[str]]:
-    response = client.models.generate_content(model="gemini-2.5-flash", contents=PROMPT.format(verb=verb))
+    tries = 2
+    while tries > 0:
+        response = client.models.generate_content(model="gemini-2.5-flash", contents=PROMPT.format(verb=verb))
 
-    if not response.text:
-        raise ValueError("No response received from the model.")
-    result = response.text.replace("```json", "").replace("```", "").strip()
+        if not response.text:
+            tries -= 1
+            print(f"Empty response when generating conjugation table for verb '{verb}'. Retrying... ({tries} tries left)")
+            continue
+        result = response.text.replace("```json", "").replace("```", "").strip()
 
-    return json.loads(result)
+        return json.loads(result)
+    raise ValueError(f"Could not generate conjugation table for verb '{verb}' after multiple attempts.")
 
 
 def validate(data : list[list[str]]) -> tuple [bool, list[str]]:
@@ -148,9 +128,20 @@ def save_generated(verb: str, data: list[list[str]]):
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
+T = TypeVar('T', str, tuple, list, dict)
+def set_in_lowercase(item : T) -> T:
+    if isinstance(item, str):
+        return item.lower()
+    elif isinstance(item, tuple) or isinstance(item, list):
+        return type(item)(set_in_lowercase(i) for i in item)
+    elif isinstance(item, dict):
+        return {set_in_lowercase(k): set_in_lowercase(v) for k, v in item.items()}
+    else:
+        return item
 
 def gen_add_verb(verb: str, tree: VerbTree):
     generated_data = generate_table(verb)
+    generated_data = set_in_lowercase(generated_data)
     if not can_be_added(generated_data):
         print(f"Skipping verb '{verb}' due to validation failure.")
         save_generated(verb, generated_data)
@@ -170,30 +161,29 @@ def gen_add_verb(verb: str, tree: VerbTree):
         tree.insert(form_conjugated, verb_data)
 
 
+def remove_from_file(verb: str):
+    with open(INFINITIVES_FILE, "r", encoding="utf-8") as f:
+        verbs = [line.strip() for line in f if line.strip()]
+    verbs = [v for v in verbs if v != verb]
+    with open(INFINITIVES_FILE, "w", encoding="utf-8") as f:
+        for v in verbs:
+            f.write(v + "\n")
+    print(f"Removed verb '{verb}' from {INFINITIVES_FILE}.")
+
+
 def gen_insert(tree_file : str):
-    config = get_config()
-    infinitives_file = config.get("infinitives_file", "infinitives.json")
-    skipped : list[int] = config.get("skipped", [])
-    processed : list[int] = config.get("processed", [])
-    with open(infinitives_file, "r", encoding="utf-8") as f:
-        verbs = json.load(f)
+    with open(INFINITIVES_FILE, "r", encoding="utf-8") as f:
+        verbs = [fline.strip() for fline in f if fline.strip()]
     
     tree = VerbTree.load(tree_file)
     nb_elements_length = len(str(len(verbs)))
     for i, verb in enumerate(verbs):
-        if i in skipped or i in processed:
-            print(f"{i+1:0{nb_elements_length}}/{len(verbs):0{nb_elements_length}} - Skipping verb '{verb}' as per configuration.")
-            continue
         print(f"{i+1:0{nb_elements_length}}/{len(verbs):0{nb_elements_length}} - Inserting conjugations for verb '{verb}' into the verb tree.")
-        
         gen_add_verb(verb, tree)
-        processed.append(i)
-        config["processed"] = processed
-        config["skipped"] = skipped
-        save_config(config)
+        remove_from_file(verb)
         tree.save(tree_file)
     print(f"Finished inserting verbs into the verb tree '{tree_file}'.")
-    print("Inserted verbs:\n", ", ".join(set(verbs) - set(skipped)))
+    print("Inserted verbs:\n", ", ".join(set(verbs)))
 
 
 if __name__ == "__main__":
