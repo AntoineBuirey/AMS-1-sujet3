@@ -1,4 +1,3 @@
-from verbs_engine import VerbTree, VerbData, mood_map, tense_map, pronoun_map
 import time
 import argparse as ap
 from typing import Callable
@@ -6,6 +5,9 @@ import shlex
 import json
 import readline
 import inspect
+
+from .verbs_engine import VerbTree, VerbData, mood_map, tense_map, pronoun_map
+
 readline.set_history_length(100)
 
 tree = VerbTree()
@@ -312,6 +314,9 @@ def mainloop():
         else:
             print(f"Unknown command: {cmd}")
 
-if __name__ == "__main__":
+def main():
     print("Welcome to the Verb Tree CLI. Type 'help' for a list of commands.")
     mainloop()
+    
+if __name__ == "__main__":
+    main()

@@ -4,11 +4,12 @@ import json
 import tempfile
 import os
 from typing import TypeVar
-from verbs_engine import VerbTree, VerbData, mood_map, tense_map, pronoun_map
+from .verbs_engine import VerbTree, VerbData, mood_map, tense_map, pronoun_map
+from .utils import resource
 
 client = genai.Client(api_key="AIzaSyCjmmCPI7RjpRRlxwCUEfs8BbZS1mbL8b8")
 
-INFINITIVES_FILE = "missing_verbs.txt"
+INFINITIVES_FILE = resource("missing_verbs.txt")
 
 PROMPT = """
 Génère une liste JSON (tableau de tableaux) contenant toutes les conjugaisons françaises du verbe '{verb}'.
