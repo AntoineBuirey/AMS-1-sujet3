@@ -59,6 +59,14 @@ def append_to_file(output_path: str, word: str):
             f.write(word+"\n")
         Logger.debug(f"Appended '{word}' to {output_path}")
         
+def save_graphml_file(output_path: str, content: str):
+    """
+    Save content to a GraphML file
+    """
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    Logger.info(f"GraphML saved to {output_path}")
+        
 def resource(filename : str) -> str:
     """
     Get the path to a resource file

@@ -26,9 +26,9 @@ from .verbs_engine import mood_map_inv, tense_map_inv, pronoun_map_inv
 from .standardizer import trim_punctuation, normalize_apostrophes, lowercase
 from .count_occurences import count_occurrences
 from .alias_resolution import resolve_aliases
-from .create_graph import create_graph, save_img_graph
+from .create_graph import create_graph, save_img_graph, to_graphml
 from .lien_personnage import build_links_file
-from .utils import save_structure_data, get_output_dir, append_to_file
+from .utils import save_structure_data, get_output_dir, append_to_file, save_graphml_file
 
 
 # logger setup
@@ -301,12 +301,6 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
             })
     return result
 
-def filter_person_nouns_only(result: list[dict], keep_only_proper: bool) -> list[dict]:
-    for sentence in result:
-        sentence["words"] = [word for word in sentence["words"] if (word["type"] in {TokenType.PROPER_NOUN.value, TokenType.COMMON_NOUN.value} and word.get("noun_type") == "person")]
-    result = [sentence for sentence in result if sentence["words"]]
-    return result
-
 def merge_determiners_nouns(result: list[dict]) -> list[dict]:
     """
     Merge determiners with the following noun into a single token
@@ -340,22 +334,6 @@ def merge_determiners_nouns(result: list[dict]) -> list[dict]:
         sentence["words"] = merged_words
     return result
 
-
-def create_link_table(result: list[dict]) -> list[list[str]]:
-    """
-    Create a link table between persons if they co-occur in the same sentence.
-    """
-    link_table = []
-    for sentence in result:
-        persons_in_sentence = [word["word"] for word in sentence["words"]
-                               if word["type"] in {TokenType.PROPER_NOUN.value, TokenType.COMMON_NOUN.value}
-                               and word.get("noun_type") == "person"]
-        for i in range(len(persons_in_sentence)):
-            for j in range(i + 1, len(persons_in_sentence)):
-                link_table.append([persons_in_sentence[i], persons_in_sentence[j]])
-    return link_table
-
-
 def get_book_chapter(input_file: str) -> tuple[str, int]:
     """
     Extract book code and chapter number from input file path.
@@ -374,10 +352,11 @@ def get_book_chapter(input_file: str) -> tuple[str, int]:
     return book_code, chapter_number
     
 def build_characters_graph(input_file: str,
-                           save_intermediate: bool = False,
-                           save_graph_image : bool = False,
-                           show_vertices_labels : bool = False,
-                           store_unknow_verb : str|None = None
+                            save_intermediate: bool = False,
+                            save_graph_image : bool = False,
+                            show_vertices_labels : bool = False,
+                            store_unknow_verb : str|None = None,
+                            save_graphml : bool = False
                            ) -> str:
     book_code, chapter_number = get_book_chapter(input_file)
 
@@ -416,8 +395,10 @@ def build_characters_graph(input_file: str,
         save_structure_data(link_table, output_dir, "link_table")
     if save_graph_image:
         save_img_graph(graph, os.path.join(output_dir, "graph.png"), show_vertices_labels=show_vertices_labels)
+    if save_graphml:
+        save_graphml_file(os.path.join(output_dir, "graphml.xml"), to_graphml(graph))
 
-    return graph
+    return to_graphml(graph, pretty=False)
 
 
 def is_filename_well_formed(filename: str) -> bool:
@@ -435,6 +416,7 @@ def main():
     parser.add_argument("--save-graph-image", "-g", action="store_true", help="Save graph image to output directory.")
     parser.add_argument("--show-vertices-labels", "-l", action="store_true", help="Show vertex labels on the saved graph image. Have no effect if --save-graph-image is not set.")
     parser.add_argument("--store-unknow-verb", "-u", help="Store unknown verbs encountered during tagging to 'output/unknown_verbs.txt'.", action="store_true")
+    parser.add_argument("--save-graphml", "-m", help="Save the graph in GraphML format to the output directory.", action="store_true")
     args = parser.parse_args()
     
     config_logger(args)
@@ -459,14 +441,12 @@ def main():
                                         save_intermediate=args.save_intermediate,
                                         save_graph_image=args.save_graph_image,
                                         show_vertices_labels=args.show_vertices_labels,
-                                        store_unknow_verb="output/unknown_verbs.txt" if args.store_unknow_verb else None
+                                        store_unknow_verb="output/unknown_verbs.txt" if args.store_unknow_verb else None,
+                                        save_graphml=args.save_graphml
                                         )
         book_code, chapter_number = get_book_chapter(input_file)
-        output_dir = get_output_dir(book_code, chapter_number)
-        output_file = os.path.join(output_dir, "graph.graphml")
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(graphml)
-        Logger.info(f"GraphML saved to: {output_file}")
+        
+        #TODO add to the general result file using the book_code and chapter_number
     
 
 
