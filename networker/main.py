@@ -2,7 +2,6 @@
 import re
 import argparse
 import os
-import datetime
 from typing import Any
 import string
  
@@ -20,16 +19,16 @@ from collections import defaultdict
 from gamuLogger import Logger, config_argparse, config_logger
 # Local modules
 
-from word_type import (TokenType, guess_type_of_token, classify_token_with_context,
+from .word_type import (TokenType, guess_type_of_token, classify_token_with_context,
                        MUST_BE_CONCATENATED, guess_noun_type, get_verb_data, Mood,
                        identify_subject_for_pronoun)
-from verbs_engine import VerbData, mood_map_inv, tense_map_inv, pronoun_map_inv
-from standardizer import trim_punctuation, normalize_apostrophes, lowercase
-from count_occurences import count_occurrences
-from alias_resolution import resolve_aliases
-from create_graph import create_graph, save_img_graph
-from lien_personnage import build_links_file
-from utils import save_structure_data, get_output_dir, append_to_file
+from .verbs_engine import mood_map_inv, tense_map_inv, pronoun_map_inv
+from .standardizer import trim_punctuation, normalize_apostrophes, lowercase
+from .count_occurences import count_occurrences
+from .alias_resolution import resolve_aliases
+from .create_graph import create_graph, save_img_graph
+from .lien_personnage import build_links_file
+from .utils import save_structure_data, get_output_dir, append_to_file
 
 
 # logger setup

@@ -5,13 +5,13 @@ import re
 
 from gamuLogger import Logger
 
-from verbs_engine import VerbTree, VerbData, Pronoun, pronoun_map, Mood, Tense
-from utils import Cache
-from standardizer import trim_punctuation
+from .verbs_engine import VerbTree, VerbData, Pronoun, pronoun_map, Mood, Tense
+from .utils import resource, Cache
+from .standardizer import trim_punctuation
 
 Logger.set_module("word_type")
 
-verb_tree = VerbTree.load("verb.data")
+verb_tree = VerbTree.load(resource("verb.data"))
 
 
 def load_file(path: str) -> list[str]:
@@ -22,7 +22,7 @@ def load_file(path: str) -> list[str]:
 
 
 # DETERMINERS = ["le", "la", "les", "un", "une", "des", "du", "l'", "tout", "toute", "tous", "toutes"]
-DETERMINERS = load_file("determiner.dict.txt")
+DETERMINERS = load_file(resource("determiner.dict.txt"))
 
 DETERMINER_SUFFIXES = [
     "-le", "-la", "-les", "-un", "-une", "-des", "-du", "-l'", "-il", "-elle", "-ils", "-elles",
@@ -54,7 +54,7 @@ PRONOUN_PREFIXES = ["J'", "C'", "L'", "Jusqu'", "D'", "Qu'", "N'", "S'"]
 #     "probablement", "rapidement", "sérieusement", "simplement",
 #     "soudain", "surtout", "vraiment"
 # ]
-ADVERBS = load_file("adverb.dict.txt")
+ADVERBS = load_file(resource("adverb.dict.txt"))
 
 PREPOSITIONS = [
     # Prépositions de base (avec leurs élisions)
@@ -130,17 +130,17 @@ PERSON_PREPOSITIONS = [
 #     "pendant que",
 #     "aussi longtemps que",    
 # ]
-CONJUNCTIONS = load_file("conjunction.dict.txt")
+CONJUNCTIONS = load_file(resource("conjunction.dict.txt"))
 
 # INTERJECTIONS = ["ah", "oh", "eh", "ouf", "hélas", "zut", "bravo", "chut", "hé", "hi", "ha"]
-INTERJECTIONS = load_file("interjection.dict.txt")
+INTERJECTIONS = load_file(resource("interjection.dict.txt"))
 
 PUNCTUATIONS = string.punctuation + "«»“”‘’…—–"
 
 #detect things like "R.D.T", "P.s.A", "U.S.A", "a.M", "R.G.p.D"
 RE_ACRONYM = re.compile(r"^([A-Za-z]\.){2,}[A-Za-z]?$")
 
-COMMON_NOUNS = load_file("noun.dict.txt")
+COMMON_NOUNS = load_file(resource("noun.dict.txt"))
 
 class TokenType(StrEnum):
     PROPER_NOUN = "proper_noun"
@@ -257,7 +257,7 @@ def get_fonctional_words() -> list[str]:
     loaded from predefined local files.
     """
     words : list[str] = []
-    files = ["fonctionnels_fr.txt", "verbes.txt"]
+    files = [resource("fonctionnels_fr.txt")]
     for file in files:
         with open(file, "r", encoding="utf-8") as f:
             words += f.read().splitlines()
@@ -267,7 +267,7 @@ def get_fonctional_words() -> list[str]:
 def get_adj_list() -> set[str]:
     """Return a set of known adjectives from the french_adjectives.txt file."""
     adjectives = set()
-    with open("french_adjectives.txt", "r", encoding="utf-8") as f:
+    with open(resource("french_adjectives.txt"), "r", encoding="utf-8") as f:
         for line in f:
             adj = line.strip()
             if adj:

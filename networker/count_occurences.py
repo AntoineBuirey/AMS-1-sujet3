@@ -1,4 +1,4 @@
-from word_type import TokenType, NounType
+from .word_type import TokenType, NounType
 
     
 def count_occurrences(data) -> dict[str, int]:

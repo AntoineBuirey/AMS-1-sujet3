@@ -2,7 +2,7 @@ import networkx as nx
 import os
 import matplotlib.pyplot as plt
 
-from standardizer import lowercase
+from .standardizer import lowercase
 
 def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) -> str:
     """
