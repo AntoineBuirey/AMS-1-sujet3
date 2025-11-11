@@ -355,7 +355,7 @@ def build_characters_graph(input_file: str,
                             save_intermediate: bool = False,
                             save_graph_image : bool = False,
                             show_vertices_labels : bool = False,
-                            store_unknow_verb : str|None = None,
+                            save_unknow_verb : str|None = None,
                             save_graphml : bool = False
                            ) -> str:
     book_code, chapter_number = get_book_chapter(input_file)
@@ -364,7 +364,7 @@ def build_characters_graph(input_file: str,
     prepared = prepare_sentences(sentences_by_pages)
     token_counts = learn_proper_token_stats(prepared)
     promoted_data = compute_promotion_demotion(*token_counts)
-    result = tag_sentence_tokens(prepared, *promoted_data, store_unknow_verb)
+    result = tag_sentence_tokens(prepared, *promoted_data, save_unknow_verb)
     
     result = identify_subject_for_pronoun(result)
     
@@ -408,14 +408,14 @@ def is_filename_well_formed(filename: str) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words.", add_help=True)
+    parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words. a classic use will be `networker -gilm`. This will generate all graphs for the input texts, and save all intermediate data structures.")
     config_argparse(parser)
     parser.add_argument("--text", "-t", type=str, help="Path to the input text file.", dest="input_file", action="append")
     parser.add_argument("--dir", "-d", type=str, help="Path to a folder containing text to process.", dest="input_dir", action="append")
     parser.add_argument("--save-intermediate", "-i", action="store_true", help="Save intermediate data structures to output directory.")
     parser.add_argument("--save-graph-image", "-g", action="store_true", help="Save graph image to output directory.")
     parser.add_argument("--show-vertices-labels", "-l", action="store_true", help="Show vertex labels on the saved graph image. Have no effect if --save-graph-image is not set.")
-    parser.add_argument("--store-unknow-verb", "-u", help="Store unknown verbs encountered during tagging to 'output/unknown_verbs.txt'.", action="store_true")
+    parser.add_argument("--save-unknow-verb", "-u", help="Store unknown verbs encountered during tagging to 'output/unknown_verbs.txt'.", action="store_true")
     parser.add_argument("--save-graphml", "-m", help="Save the graph in GraphML format to the output directory.", action="store_true")
     args = parser.parse_args()
     
@@ -441,7 +441,7 @@ def main():
                                         save_intermediate=args.save_intermediate,
                                         save_graph_image=args.save_graph_image,
                                         show_vertices_labels=args.show_vertices_labels,
-                                        store_unknow_verb="output/unknown_verbs.txt" if args.store_unknow_verb else None,
+                                        save_unknow_verb="output/unknown_verbs.txt" if args.save_unknow_verb else None,
                                         save_graphml=args.save_graphml
                                         )
         book_code, chapter_number = get_book_chapter(input_file)
