@@ -53,7 +53,6 @@ def load(file_path: str, json: bool = False):
     """Load a verb tree from a file. Usage: load <file_path> [--json]"""
     global tree
     global tree_filename
-    tree_filename = file_path
     if json:
         timer = time.time()
         tree = VerbTree.load_json(file_path)
@@ -62,13 +61,33 @@ def load(file_path: str, json: bool = False):
         timer = time.time()
         tree = VerbTree.load(file_path)
         print(f"Verb tree loaded from {file_path} in {time.time() - timer:.6f} seconds")
+    tree_filename = file_path
 
 
 ########################################### Operations ############################################
 
-def list_verbs():
-    """List all infinitive verbs in the tree. Usage: list"""
-    print(tree.list_verbs())
+def list_verbs(len : int = -1):
+    """List all infinitive verbs in the tree. Usage: list [--len <number>]"""
+    infinitives = tree.list_verbs()
+    if len > 0:
+        infinitives = infinitives[:len]
+    for infinitive in infinitives:
+        print(infinitive)
+        
+def head(len : int = 10):
+    """Display the first n verbs in the tree. Usage: head [--len <number>]"""
+    count = 0
+    for form, data in tree:
+        print(f"{form:24} -> {data}")
+        count += 1
+        if count >= len:
+            break
+
+def tail(len : int = 10):
+    """Display the last n verbs in the tree. Usage: tail [--len <number>]"""
+    all_verbs = list(tree)
+    for form, data in all_verbs[-len:]:
+        print(f"{form:24} -> {data}")
     
 def size():
     """Display the size of the verb tree. Usage: size"""
@@ -128,12 +147,12 @@ def lookup(infinitive_to_lookup: str, mood: str = "", tense: str = "", pronoun: 
 
 ############################################ Editing ############################################
 
-def extend(file: str):
-    """Extend the verb tree with predefined data from a file. Usage: extend <file>"""
+def extend(file_path: str):
+    """Extend the verb tree with predefined data from a file. Usage: extend <file_path>"""
     global edited
     timer = time.time()
 
-    with open(file, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         verb_data = json.load(f)
     count = 0
     for entry in verb_data:
@@ -144,7 +163,7 @@ def extend(file: str):
         pronoun = pronoun_map[entry[4]]
         tree.insert(conjugated_form, VerbData(infinitive, mood, tense, pronoun))
         count += 1
-    print(f"Extended verb tree with {count} entries from {file} in {time.time() - timer:.6f} seconds")
+    print(f"Extended verb tree with {count} entries from {file_path} in {time.time() - timer:.6f} seconds")
     edited = True
     if auto_save:
         tree.save(tree_filename)
@@ -215,25 +234,33 @@ def remove_duplicates(simulate: bool = False):
 ############################################# Saving ##############################################        
 
 
-def save(file: str = "", json: bool = False):
+def save(file_path: str = "", json: bool = False):
     """Save the verb tree to a file. Usage: save [file_path] [--json]"""
-    if file == "":
-        file = tree_filename
+    if file_path == "":
+        file_path = tree_filename
     if json:
         timer = time.time()
-        tree.save_json(file)
-        print(f"Verb tree saved in json format to {file} in {time.time() - timer:.6f} seconds")
+        tree.save_json(file_path)
+        print(f"Verb tree saved in json format to {file_path} in {time.time() - timer:.6f} seconds")
     else:
         timer = time.time()
-        tree.save(file)
-        print(f"Verb tree saved to {file} in {time.time() - timer:.6f} seconds")
+        tree.save(file_path)
+        print(f"Verb tree saved to {file_path} in {time.time() - timer:.6f} seconds")
     global edited
     edited = False
+
+def export_uncompressed(file_path: str):
+    """Export the verb tree to an uncompressed file. Usage: export_uncompressed <file_path>"""
+    timer = time.time()
+    tree.save_uncompressed(file_path)
+    print(f"Verb tree exported uncompressed to {file_path} in {time.time() - timer:.6f} seconds")
 
 
 OPERATIONS : dict[str, Callable[..., None]] = {
     "load": load,
     "list": list_verbs,
+    "head": head,
+    "tail": tail,
     "size": size,
     "health": health,
     "has": has,
@@ -244,6 +271,7 @@ OPERATIONS : dict[str, Callable[..., None]] = {
     "harmonize": harmonize,
     "remove_duplicates": remove_duplicates,
     "save": save,
+    "export_uncompressed": export_uncompressed,
     "autosave": set_autosave,
 }
 
@@ -315,7 +343,16 @@ def mainloop():
             print(f"Unknown command: {cmd}")
 
 def main():
+    argparser = ap.ArgumentParser(description="Verb Tree CLI")
+    argparser.add_argument("file", type=str, help="Path to the verb tree file to load", default=None, nargs="?")
+    argparser.add_argument("--json", action="store_true", help="Load the verb tree in JSON format")
+    args = argparser.parse_args()
+    
     print("Welcome to the Verb Tree CLI. Type 'help' for a list of commands.")
+
+    if args.file:
+        load(args.file, json=args.json)
+    
     mainloop()
     
 if __name__ == "__main__":

@@ -1,6 +1,0 @@
-env
-networker
-originals_dataset
-output
-text_dataset
-tools

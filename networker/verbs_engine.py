@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, IO
 from random import choice
 from string import ascii_lowercase, digits
 import json
@@ -312,24 +312,44 @@ class VerbTree:
                 verb_data_list.append(child.value)  # type: ignore
         return verb_data_list
     
+    def __save_to_file(self, file : IO) -> None:
+        for conjugated_form, verb_data in self:
+            line = f"{conjugated_form}\x1d".encode("utf-8") + verb_data.serialize_binary() + b"\n"
+            file.write(line)
+            
     def save(self, filepath : str) -> None:
         with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
             with zipf.open("data", 'w') as f:
-                for conjugated_form, verb_data in self:
-                    line = f"{conjugated_form}\x1d".encode("utf-8") + verb_data.serialize_binary() + b"\n"
-                    f.write(line)
+                self.__save_to_file(f)
+    
+    def save_uncompressed(self, filepath : str) -> None:
+        with open(filepath, 'wb') as f:
+            self.__save_to_file(f)
+
+    @classmethod
+    def __load_from_file(cls, file : IO) -> 'VerbTree':
+        tree = cls()
+        for line in file:
+            line = line.rstrip(b"\n")
+            conjugated_form, verb_data_bin = line.split(b"\x1d", 1)
+            conjugated_form_str = conjugated_form.decode("utf-8")
+            verb_data = VerbData.deserialize_binary(verb_data_bin)
+            tree.insert(conjugated_form_str, verb_data)
+        return tree
 
     @classmethod
     def load(cls, filepath : str) -> 'VerbTree':
         tree = cls()
         with zipfile.ZipFile(filepath, 'r') as zipf:
             with zipf.open("data", 'r') as f:
-                for line in f:
-                    line = line.rstrip(b"\n")
-                    conjugated_form, verb_data_bin = line.split(b"\x1d", 1)
-                    conjugated_form_str = conjugated_form.decode("utf-8")
-                    verb_data = VerbData.deserialize_binary(verb_data_bin)
-                    tree.insert(conjugated_form_str, verb_data)
+                tree = cls.__load_from_file(f)
+        return tree
+    
+    @classmethod
+    def load_uncompressed(cls, filepath : str) -> 'VerbTree':
+        tree = cls()
+        with open(filepath, 'rb') as f:
+            tree = cls.__load_from_file(f)
         return tree
         
     def save_json(self, filepath : str) -> None:

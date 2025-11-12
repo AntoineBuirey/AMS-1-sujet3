@@ -16,6 +16,7 @@ def init_nltk():
 
 from nltk.tokenize import sent_tokenize, word_tokenize
 from collections import defaultdict
+import pandas as pd
 from gamuLogger import Logger, config_argparse, config_logger
 # Local modules
 
@@ -407,6 +408,20 @@ def is_filename_well_formed(filename: str) -> bool:
     return match is not None
 
 
+# def append_to_csv(book_code: str, chapter_number: int, graphml: str) -> None:
+#     output_file = "output/graphs_summary.csv"
+#     header = "ID,graphml\n"
+#     if not os.path.exists("output"):
+#         os.makedirs("output")
+#     if not os.path.isfile(output_file):
+#         with open(output_file, "w", encoding="utf-8") as f:
+#             f.write(header)
+#     graphml = graphml.replace('"', '""')  # Escape double quotes for CSV
+#     with open(output_file, "a", encoding="utf-8") as f:
+#         line = f'{book_code}{chapter_number},"{graphml}"\n'
+#         f.write(line)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Tokenize a text file into sentences and words. a classic use will be `networker -gilm`. This will generate all graphs for the input texts, and save all intermediate data structures.")
     config_argparse(parser)
@@ -417,11 +432,14 @@ def main():
     parser.add_argument("--show-vertices-labels", "-l", action="store_true", help="Show vertex labels on the saved graph image. Have no effect if --save-graph-image is not set.")
     parser.add_argument("--save-unknow-verb", "-u", help="Store unknown verbs encountered during tagging to 'output/unknown_verbs.txt'.", action="store_true")
     parser.add_argument("--save-graphml", "-m", help="Save the graph in GraphML format to the output directory.", action="store_true")
+    parser.add_argument("--csv", "-c", help="Append results to a summary CSV file 'output/graphs_summary.csv'.", action="store_true")
     args = parser.parse_args()
     
     config_logger(args)
     
     init_nltk() # differ nltk initialization to after parsing arguments, to avoid unnecessary downloads if help is requested
+    
+    df_dict = {"ID": [], "graphml": []}
     
     if not args.input_file and not args.input_dir:
         Logger.warning("no input files or directories provided. taking texts from ./text_dataset/ by default.")
@@ -447,7 +465,14 @@ def main():
         book_code, chapter_number = get_book_chapter(input_file)
         
         #TODO add to the general result file using the book_code and chapter_number
-    
+        if args.csv:
+            # append_to_csv(book_code, chapter_number, graphml)
+            df_dict["ID"].append(f"{book_code}{chapter_number}")
+            df_dict["graphml"].append(graphml)
+    if args.csv:
+        df = pd.DataFrame(df_dict)
+        df.set_index("ID", inplace=True)
+        df.to_csv("./output/my_submission.csv")
 
 
 if __name__ == "__main__":
