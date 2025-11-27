@@ -47,6 +47,7 @@ auxquels
 auxquelles
 avec
 avant
+apparence
 #################################
 #                                #        
 #        B                        #
@@ -114,6 +115,9 @@ cent
 cents
 cinq
 cinquante
+croyance
+coup
+ç
 #################################
 #                                #
 #        CH                       #
@@ -194,6 +198,9 @@ euh
 eux
 évidemment
 exprès
+encyclopaedia 
+galactica2
+galactica
 #################################
 #                                #
 #        F                        #
@@ -205,6 +212,7 @@ façons
 facilement
 finalement
 fois
+fuite
 #################################
 #                                #
 #        G                        #
@@ -422,6 +430,8 @@ puisqu
 puisque
 premier
 première
+pseudomagnétique
+parole
 #################################
 #                                #
 #        Q                        #

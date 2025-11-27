@@ -469,13 +469,13 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
             return NounType.PERSON, "person preposition before"
         
         # if the next word is a verb at 3rd person, it's most likely a person
-        if index + 1 < len(sentence):
-            next_word = sentence[index+1].lower()
-            next_word_data = guess_type_of_token(sentence, index+1)
-            if next_word_data == TokenType.VERB:
-                verb_data = get_verb_data(next_word, sentence_data, index+1)
-                if verb_data.pronoun == Pronoun.IL_ELLE_ON:
-                    return NounType.PERSON, "next word is 3rd person verb"
+        # if index + 1 < len(sentence):
+        #     next_word = sentence[index+1].lower()
+        #     next_word_data = guess_type_of_token(sentence, index+1)
+        #     if next_word_data == TokenType.VERB:
+        #         verb_data = get_verb_data(next_word, sentence_data, index+1)
+        #         if verb_data.pronoun == Pronoun.IL_ELLE_ON:
+        #             return NounType.PERSON, "next word is 3rd person verb"
                 
         # if the previous word is a verb at 3rd person, it's most likely a person
         # but in that case, the verb should be in past tense (passé simple or imparfait)

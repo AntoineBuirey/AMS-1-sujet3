@@ -4628,3 +4628,5 @@
 îlots directionnels
 ïambe
 ïambes
+université
+bibliothèque
