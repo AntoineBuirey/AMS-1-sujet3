@@ -187,7 +187,7 @@ def gen_insert(tree_file : str):
     print("Inserted verbs:\n", ", ".join(set(verbs)))
 
 
-if __name__ == "__main__":
+def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Generate and insert verb conjugations into a verb tree.")
@@ -206,7 +206,7 @@ if __name__ == "__main__":
         gen_insert(treefile)
     
     elif args.select:
-        treefile = "verb.data"
+        treefile = "networker/data/verb.data"
         
         if not os.path.exists(treefile):
             tree = VerbTree()
@@ -222,3 +222,6 @@ if __name__ == "__main__":
     
     else:
         parser.print_help()
+        
+if __name__ == "__main__":
+    main()

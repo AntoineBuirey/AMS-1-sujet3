@@ -5,7 +5,8 @@ from gamuLogger import Logger
 
 Logger.set_module("create_graph")
 
-from .standardizer import lowercase
+from .standardizer import lowercase, capitalize_all_words
+
 
 def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) -> nx.Graph:
     """
@@ -17,7 +18,7 @@ def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) 
     """
     G = nx.Graph()
     for person in persons:
-        aliases = ";".join(person)
+        aliases = ";".join(capitalize_all_words(n) for n in person)
         id = person[0].replace(" ", "_")
         G.add_node(id, names=aliases)
         

@@ -28,3 +28,7 @@ def lowercase(item: T) -> T:
         return {lowercase(elem) for elem in item}
     else:
         return item
+    
+def capitalize_all_words(s: str) -> str:
+    """Uppercase all words in a string."""
+    return ' '.join(word.capitalize() for word in s.split())
