@@ -38,12 +38,12 @@ Logger.set_module("main")
 
 # ===== Constants =====
 # Thresholds for promotion/demotion of proper-noun candidates
-PROMOTE_MIN_COUNT = 1        # min proper observations to consider a token
-PROMOTE_MIN_SCORE = 0.6      # proper / (proper + nonproper_lower)
-PROMOTE_MIN_BIGRAM = 1       # min observations for a proper bigram
+PROMOTE_MIN_COUNT = 3        # min proper observations to consider a token
+PROMOTE_MIN_SCORE = 0.8     # proper / (proper + nonproper_lower)
+PROMOTE_MIN_BIGRAM = 1      # min observations for a proper bigram
 
-DEMOTE_MIN_COUNT = 3         # minimum times seen in lowercase to be reliable
-DEMOTE_MAX_RATIO = 0.3       # if proper/(proper+nonproper) < 0.3 => demoted
+DEMOTE_MIN_COUNT = 1        # minimum times seen in lowercase to be reliable
+DEMOTE_MAX_RATIO = 0.15       # if proper/(proper+nonproper) < 0.3 => demoted
 
 # Tokenization constants
 PAGE_BREAK_TOKEN = "__PAGE_BREAK__"
@@ -453,6 +453,12 @@ def main():
                     input_files.append(os.path.join(input_dir, fname))
                 else:
                     Logger.warning(f"Skipping file with unexpected name format: {fname}")
+    # Sort input files by (book_code, chapter_number) so CSV rows are ordered
+    def _sort_key(path: str):
+        code, chap = get_book_chapter(path)
+        book_order = 0 if code == "paf" else 1
+        return (book_order, chap)
+    input_files = sorted(input_files, key=_sort_key)
     for input_file in input_files:
         Logger.info(f"Processing file: {input_file}")
         graphml = build_characters_graph(input_file,
@@ -470,9 +476,18 @@ def main():
             df_dict["ID"].append(f"{book_code}{chapter_number}")
             df_dict["graphml"].append(graphml)
     if args.csv:
+        # Build DataFrame from collected graphs
         df = pd.DataFrame(df_dict)
-        df.set_index("ID", inplace=True)
-        df.to_csv("./output/my_submission.csv")
+        # Extract book code (first 3 chars) and chapter number (rest as int) for natural sort
+        df["book"] = df["ID"].str[:3]
+        df["chap"] = df["ID"].str[3:].astype(int)
+        df["book_order"] = df["book"].map({"paf": 0, "lca": 1})
+
+        df = df.sort_values(["book_order", "chap"])
+
+        df = df[["ID", "graphml"]]
+        # Write CSV without index (Kaggle expects only ID,graphml)
+        df.to_csv("./output/my_submission.csv", index=False)
 
 
 if __name__ == "__main__":
