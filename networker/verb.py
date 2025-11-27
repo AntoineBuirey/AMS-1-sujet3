@@ -178,9 +178,10 @@ def insert(infinitive: str, mood: str, tense: str, pronoun: str, form: str):
 
 def harmonize(simulate : bool = False):
     """Harmonize the verb tree by converting all forms and infinitives to lowercase. Usage: harmonize [--simulate]"""
-    # put all verbs, conjugated forms and infinitives, to lowercase
     global edited
     global tree
+    
+    # put all verbs, conjugated forms and infinitives, to lowercase
     timer = time.time()
     new_tree = VerbTree()
     count = 0
@@ -200,6 +201,57 @@ def harmonize(simulate : bool = False):
     else:
         tree = new_tree
         print(f"Harmonized verb tree to lowercase with {count} entries in {time.time() - timer:.6f} seconds")
+        if auto_save:
+            tree.save(tree_filename)
+    
+def sanitize(simulate: bool = False):
+    """Sanitize the verb tree by transforming variable forms into separate variants. Usage: sanitize [--simulate]"""
+    global edited
+    global tree
+    # transform all variable forms (those with parentheses) to separated variants
+    # e.g. "soyons rendu(e)s" -> "soyons rendus" and "soyons rendue"
+    # e.g. "fûtes allé(e)(s)" -> "fûtes allé", "fûtes allés", "fûtes allée", "fûtes allées"
+    timer = time.time()
+    new_tree = VerbTree()
+    count = 0
+    for form, data in tree:
+        if "(" in form and ")" in form:
+            base_form = ""
+            i = 0
+            variants = [""]
+            while i < len(form):
+                if form[i] == "(":
+                    j = i + 1
+                    optional_part = ""
+                    while j < len(form) and form[j] != ")":
+                        optional_part += form[j]
+                        j += 1
+                    # create new variants with and without the optional part
+                    new_variants = []
+                    for variant in variants:
+                        new_variants.append(variant)  # without optional part
+                        new_variants.append(variant + optional_part)  # with optional part
+                    variants = new_variants
+                    i = j + 1
+                else:
+                    for k in range(len(variants)):
+                        variants[k] += form[i]
+                    i += 1
+            for variant in variants:
+                variant = variant.strip()
+                if variant:
+                    new_tree.insert(variant, data)
+                    print(f"Sanitizing: '{form}' -> '{variant}'")
+                    if not simulate:
+                        edited = True
+        else:
+            new_tree.insert(form, data)
+        count += 1
+    if simulate:
+        print(f"Simulated sanitization of variable forms with {count} entries in {time.time() - timer:.6f} seconds")
+    else:
+        tree = new_tree
+        print(f"Sanitized variable forms in verb tree with {count} entries in {time.time() - timer:.6f} seconds")
         if auto_save:
             tree.save(tree_filename)
 
@@ -269,6 +321,7 @@ OPERATIONS : dict[str, Callable[..., None]] = {
     "extend": extend,
     "insert": insert,
     "harmonize": harmonize,
+    "sanitize": sanitize,
     "remove_duplicates": remove_duplicates,
     "save": save,
     "export_uncompressed": export_uncompressed,

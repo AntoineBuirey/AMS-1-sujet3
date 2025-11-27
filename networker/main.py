@@ -254,13 +254,12 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                     except ValueError as e:
                         # don't merge if the verb not found, mark the second element as ADJECTIVE instead
                         words_list_dict[-1]["word"] = words_list_dict[-1]["word"].rsplit(" ", 1)[0]
-                        token_type = TokenType.ADJECTIVE
                         words_list_dict.append({
                             "word": tok,
                             "position": j,
-                            "type": token_type.value
+                            "type": TokenType.ADJECTIVE.value
                         })
-                        Logger.warning(f"Could not find verb data for concatenated verb '{words_list_dict[-1]['word']}'. Marking it as ADJECTIVE.")
+                        Logger.warning(f"{e}")
                         if store_unknow_verb:
                             append_to_file(store_unknow_verb, words_list_dict[-1]['word'])
                             Logger.debug(f"Stored unknown verb '{words_list_dict[-1]['word']}' to {store_unknow_verb}")
