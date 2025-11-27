@@ -100,9 +100,17 @@ TIME_PREPOSITIONS = [
     "avant", "après", "depuis", "entre", "jusque", "jusqu'"
 ]
 
+
 PERSON_PREPOSITIONS = [
     "chez", "selon"
 ]
+
+# Special case: Encyclopaedia Galactica should never be classified as a person
+SPECIAL_NON_PERSON_TOKENS = [
+    "encyclopaedia ","galactica",
+    "encyclopaedia_galactica","mycogène"
+]
+
 
 # CONJUNCTIONS = [
 #     # coordinating conjunctions
@@ -436,6 +444,10 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
     """
     return the guessed noun type (place, person, unknown) and the reason
     """
+    word = sentence[index]
+    normalized = trim_punctuation(word.lower())
+    if normalized in SPECIAL_NON_PERSON_TOKENS:
+        return NounType.UNKNOWN, "special non-person token"
     if word_type == TokenType.PROPER_NOUN:
         # if the word is at the beginning of the sentence, it's most likely a person
         # except if the next word is a "=", which indicates we are in a footer.
