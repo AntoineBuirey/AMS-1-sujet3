@@ -108,7 +108,7 @@ PERSON_PREPOSITIONS = [
 # Special case: Encyclopaedia Galactica should never be classified as a person
 SPECIAL_NON_PERSON_TOKENS = [
     "encyclopaedia ","galactica",
-    "encyclopaedia_galactica","mycogène"
+    "encyclopaedia_galactica","mycogène","terra","galactica2"," galactica"
 ]
 
 

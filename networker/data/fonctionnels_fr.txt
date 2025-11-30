@@ -48,6 +48,7 @@ auxquelles
 avec
 avant
 apparence
+aire
 #################################
 #                                #        
 #        B                        #
@@ -69,6 +70,8 @@ boum
 bravo
 bref
 brr
+bonjour
+bonsoir
 #################################
 #                               #        
 #        C                      #
@@ -119,6 +122,7 @@ croyance
 coup
 ç
 couverture
+culture
 #################################
 #                                #
 #        CH                       #
@@ -174,6 +178,7 @@ deux
 dix
 douze
 dommage
+désir
 #################################
 #                                #
 #        E                        #
@@ -302,6 +307,7 @@ lors
 lorsqu
 lorsque
 lui
+livre
 #################################
 #                                #
 #        M                        #
@@ -342,6 +348,7 @@ mille
 million
 milliard
 microfermes
+musique
 #################################
 #                                #
 #        N                        #
@@ -364,6 +371,7 @@ nul
 nulle
 nullement
 neuf
+nombre
 #################################
 #                                #
 #        O                        #
@@ -437,6 +445,10 @@ première
 pseudomagnétique
 parole
 plateaux
+puit
+puits
+prédictions
+principes
 #################################
 #                                #
 #        Q                        #
@@ -465,6 +477,7 @@ quatorze
 quarante
 quatre
 quinze
+quantité
 #################################
 #                                #
 #        R                        #
@@ -476,6 +489,8 @@ relativement
 respectivement
 résultat
 rythme
+renversement
+retour
 #################################
 #                                #
 #        S                        #
@@ -529,6 +544,8 @@ six
 soixante
 sauvtage
 secteur
+sacratorium
+service
 #################################
 #                                #
 #        T                        #
@@ -573,6 +590,7 @@ treize
 trente
 tradition
 rite
+terme
 #################################
 #                                #
 #        U                        #
