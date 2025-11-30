@@ -403,7 +403,8 @@ PRONOUN_MAP = {
 
 def get_verb_data(verb: str, words_list_dict, position : int) -> VerbData:
     """Return all possible conjugations and info for a verb as a list of VerbData."""
-    candidates = verb_tree.get(verb.lower().strip(string.punctuation))
+    verb = verb.lower().strip(string.punctuation)
+    candidates = verb_tree.get(verb, strict=False)
     if not candidates:
         if " " in verb:
             part1, part2 = verb.split(" ", 1)

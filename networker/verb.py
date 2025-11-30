@@ -6,6 +6,9 @@ import json
 import readline
 import inspect
 
+from gamuLogger import Logger, config_argparse, config_logger
+Logger.set_module("verb cli")
+
 from .verbs_engine import VerbTree, VerbData, mood_map, tense_map, pronoun_map
 
 readline.set_history_length(100)
@@ -119,9 +122,9 @@ def has(verb_to_check: str):
     else:
         print(f"The verb '{verb_to_check}' does NOT exist in the tree.")
 
-def get(verb_to_get: str):
-    """Get conjugation data for a verb. Usage: get <verb>"""
-    conjugations = tree.get(verb_to_get)
+def get(verb_to_get: str, strict: bool = False):
+    """Get conjugation data for a verb. Usage: get <verb> [--strict <true|false>]"""
+    conjugations = tree.get(verb_to_get, strict=strict)
     if conjugations:
         print(f"Conjugation data for '{verb_to_get}':")
         for conjugation in conjugations:
@@ -351,7 +354,11 @@ def mainloop():
             color = COLORS["yellow"]
         else:
             color = COLORS["green"]
-        full_cmd = input(f"{color}{tree_filename.split("/")[-1]}> \033[0m").strip()
+        try:
+            full_cmd = input(f"{color}{tree_filename.split("/")[-1]}> \033[0m").strip()
+        except (EOFError, KeyboardInterrupt):
+            print() #new line
+            break
         try:
             tokens = shlex.split(full_cmd)
         except ValueError as e:
@@ -371,7 +378,6 @@ def mainloop():
                     confirm = input("You have unsaved changes. Quit without saving? (y/n): ").strip().lower()
                     if confirm != "y":
                         return
-            print("Bye.")
             break
         elif cmd == "help":
             if args and args[0] in OPERATIONS:
@@ -394,12 +400,16 @@ def mainloop():
                 print(f"Error executing command '{cmd}': {e.__class__.__name__}: {e}")
         else:
             print(f"Unknown command: {cmd}")
+    print("Bye.")
 
 def main():
     argparser = ap.ArgumentParser(description="Verb Tree CLI")
     argparser.add_argument("file", type=str, help="Path to the verb tree file to load", default=None, nargs="?")
     argparser.add_argument("--json", action="store_true", help="Load the verb tree in JSON format")
+    
+    config_argparse(argparser)
     args = argparser.parse_args()
+    config_logger(args)
     
     print("Welcome to the Verb Tree CLI. Type 'help' for a list of commands.")
 

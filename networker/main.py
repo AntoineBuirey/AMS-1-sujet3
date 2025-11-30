@@ -259,7 +259,8 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                             "position": j,
                             "type": TokenType.ADJECTIVE.value
                         })
-                        Logger.warning(f"{e}")
+                        prev_token = words_list_dict[-2]
+                        Logger.debug(f"{e}\ndefaulting to:\n\t{prev_token['word']:10} {prev_token['type']}\n\t{tok:10} adjective")
                         if store_unknow_verb:
                             append_to_file(store_unknow_verb, words_list_dict[-1]['word'])
                             Logger.debug(f"Stored unknown verb '{words_list_dict[-1]['word']}' to {store_unknow_verb}")
@@ -384,15 +385,16 @@ def build_characters_graph(input_file: str,
     aliases = lowercase(aliases)
     link_table = lowercase(link_table)
     
-    graph = create_graph(aliases, link_table)
-    
     output_dir = get_output_dir(book_code, chapter_number)
     
     if save_intermediate:
-        save_structure_data(result, output_dir, "parsed_sentences")
-        save_structure_data(word_count, output_dir, "word_count")
         save_structure_data(aliases, output_dir, "aliases")
         save_structure_data(link_table, output_dir, "link_table")
+        save_structure_data(result, output_dir, "parsed_sentences")
+        save_structure_data(word_count, output_dir, "word_count")
+    
+    graph = create_graph(aliases, link_table)
+    
     if save_graph_image:
         save_img_graph(graph, os.path.join(output_dir, "graph.png"), show_vertices_labels=show_vertices_labels)
     if save_graphml:
@@ -405,20 +407,6 @@ def is_filename_well_formed(filename: str) -> bool:
     base_name = os.path.basename(filename)
     match = re.match(r"([a-zA-Z]+)[._-]chapter[_-](\d+)\.txt$", base_name)
     return match is not None
-
-
-# def append_to_csv(book_code: str, chapter_number: int, graphml: str) -> None:
-#     output_file = "output/graphs_summary.csv"
-#     header = "ID,graphml\n"
-#     if not os.path.exists("output"):
-#         os.makedirs("output")
-#     if not os.path.isfile(output_file):
-#         with open(output_file, "w", encoding="utf-8") as f:
-#             f.write(header)
-#     graphml = graphml.replace('"', '""')  # Escape double quotes for CSV
-#     with open(output_file, "a", encoding="utf-8") as f:
-#         line = f'{book_code}{chapter_number},"{graphml}"\n'
-#         f.write(line)
 
 
 def main():

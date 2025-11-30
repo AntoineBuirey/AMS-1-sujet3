@@ -20,7 +20,8 @@ Subjonctif (Présent, Imparfait, Passé, Plus-que-parfait), Conditionnel (Prése
 Infinitif (Présent, Passé), et Participe (Présent, Passé).
 N'ajoute pas d'autres modes ou temps.
 Pour personne, utilise 'je', 'tu', 'il/elle/on', 'nous', 'vous', 'ils/elles', ou 'n/a'.
-Inclus les 4 formes du participe passé.
+Inclus les 4 formes du participe passé (masculin singulier, féminin singulier, masculin pluriel, féminin pluriel) séparément, tous en utilisant le pronom "n/a".
+Si le verbe peut être conjugué avec les auxiliaires 'avoir' et 'être', génère les deux formes pour les temps composés.
 Exemple : [['aime', 'aimer', 'indicatif', 'présent', 'je'], ...].
 """
 
@@ -35,7 +36,12 @@ def generate_table(verb: str) -> list[list[str]]:
             continue
         result = response.text.replace("```json", "").replace("```", "").strip()
 
-        return json.loads(result)
+        try:
+            return json.loads(result)
+        except json.JSONDecodeError as e:
+            tries -= 1
+            print(f"JSON decoding error when generating conjugation table for verb '{verb}': {e}. Retrying... ({tries} tries left)")
+            continue
     raise ValueError(f"Could not generate conjugation table for verb '{verb}' after multiple attempts.")
 
 
@@ -192,29 +198,22 @@ def main():
     
     parser = argparse.ArgumentParser(description="Generate and insert verb conjugations into a verb tree.")
     parser.add_argument("--all", action="store_true", help="Process all verbs without skipping any.")
-    parser.add_argument("--select", "-s", type=str, nargs="+", help="List of verb infinitives to process. In that mode, ignore the config file.")
+    parser.add_argument("--select", "-s", type=str, nargs="+", help="List of verb infinitives to process. In that mode, ignore the config file.", action="append")
     args = parser.parse_args()
     
+    treefile = "networker/data/verb.data"
+    if not os.path.exists(treefile):
+        tree = VerbTree()
+        tree.save(treefile)
+        print(f"Created empty verb tree file: {treefile}")
+    
     if args.all:
-        treefile = "verb.data"
-        
-        if not os.path.exists(treefile):
-            tree = VerbTree()
-            tree.save(treefile)
-            print(f"Created empty verb tree file: {treefile}")
-        
         gen_insert(treefile)
     
     elif args.select:
-        treefile = "networker/data/verb.data"
-        
-        if not os.path.exists(treefile):
-            tree = VerbTree()
-            tree.save(treefile)
-            print(f"Created empty verb tree file: {treefile}")
-        
         tree = VerbTree.load(treefile)
         for verb in args.select:
+            verb = verb[0]  # because of action="append"
             print(f"Inserting conjugations for verb '{verb}' into the verb tree.")
             gen_add_verb(verb, tree)
         tree.save(treefile)

@@ -5,6 +5,24 @@ from string import ascii_lowercase, digits
 import json
 import zipfile
 
+from gamuLogger import Logger
+Logger.set_module("verbs engine")
+
+
+def get_char_variants(char: str) -> list[str]:
+    """
+    Return a list of character variants for the given character.
+    """
+    variants = {
+        'a': ['a', 'à', 'â', 'ä'],
+        'c': ['c', 'ç'],
+        'e': ['e', 'é', 'è', 'ê', 'ë'],
+        'i': ['i', 'î', 'ï'],
+        'o': ['o', 'ô', 'ö'],
+        'u': ['u', 'ù', 'û', 'ü']
+    }
+    return variants.get(char, [char])
+
 
 class NodeType(Enum):
     VERB = 1
@@ -297,12 +315,20 @@ class VerbTree:
                     yield from traverse(child, current_verb)
         yield from traverse(self.root, "")
     
-    def get(self, verb : str) -> list[VerbData]:
+    def get(self, verb : str, strict : bool = True) -> list[VerbData]:
+        if strict:
+            return self.__get_strict(verb)
+        else:
+            return self.__get_permissive(verb)
+        
+        
+    def __get_strict(self, verb : str) -> list[VerbData]:
         current_node = self.root
         for char in verb:
             if current_node is None:
                 return []
             current_node = current_node.get_child(char)
+            Logger.trace(f"Traversing char '{char}': current_node = {current_node}")
         if current_node is None:
             return []
         # Collect all verb data from verb nodes among the children
@@ -310,6 +336,40 @@ class VerbTree:
         for child in current_node.children.values():
             if child.is_verb():
                 verb_data_list.append(child.value)  # type: ignore
+        return verb_data_list
+    
+    def __get_permissive(self, verb : str) -> list[VerbData]:
+        # To be implemented
+        paths : list[str] = ['']
+        for char in verb:
+            new_paths : list[str] = []
+            char_variants = get_char_variants(char)
+            for path in paths:
+                current_node = self.root
+                for c in path:
+                    if current_node is None:
+                        break
+                    current_node = current_node.get_child(c)
+                if current_node is None:
+                    continue
+                for variant in char_variants:
+                    if current_node.has_child(variant):
+                        new_paths.append(path + variant)
+            paths = new_paths
+            Logger.trace(f"After processing char '{char}': possible paths = {paths}")
+        # Now collect verb data from all valid paths
+        verb_data_list : list[VerbData] = []
+        for path in paths:
+            current_node = self.root
+            for char in path:
+                if current_node is None:
+                    break
+                current_node = current_node.get_child(char)
+            if current_node is None:
+                continue
+            for child in current_node.children.values():
+                if child.is_verb():
+                    verb_data_list.append(child.value)  # type: ignore
         return verb_data_list
     
     def __save_to_file(self, file : IO) -> None:
