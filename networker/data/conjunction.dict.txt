@@ -312,3 +312,4 @@ vu que
 étant donné
 étant donné que
 où
+pourvu
