@@ -204,18 +204,7 @@ def infer_alias_map(characters: List[str], raw_links: List[Tuple[str, str]]) -> 
 
     return alias
 
-    def find_canon(x: str) -> str:
-        seen = set()
-        while x in alias and alias[x] != x and alias[x] not in seen:
-            seen.add(x)
-            x = alias[x]
-        return alias.get(x, x)
-
-    for k in list(alias.keys()):
-        alias[k] = find_canon(alias[k])
-
-    return alias
-
+# ------------------ canonicalisation des liens ------------------
 def canonicalize_links(raw_links: List[Tuple[str, str]],
                        alias_map: Dict[str, str],
                        undirected: bool = True) -> Counter:
