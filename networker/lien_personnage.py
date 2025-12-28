@@ -141,33 +141,68 @@ def add_dominant_alias_by_ratio(
 def infer_alias_map(characters: List[str], raw_links: List[Tuple[str, str]]) -> Dict[str, str]:
     alias: Dict[str, str] = {}
 
-    # 1) normalisation casse
+    # 1) Normalisation initiale de la casse (Pretty Case)
+    # Ex: "julius enderby" -> "Julius Enderby"
     for name in characters:
         alias[name] = pretty_case(name.lower())
 
-    # Compte non orienté pour estimer co-liens
-    pair_counter = Counter(raw_links) + Counter((b, a) for (a, b) in raw_links)
+    # ---  ÉTAPE : FUSION STRICTE PAR INCLUSION (Force Merge) ---
+    # On récupère la liste unique des noms normalisés
+    unique_names = list(set(alias.values()))
+    
+    # On trie par longueur décroissante (les noms les plus longs en premier)
+    # Ex: ["Julius Enderby", "Enderby", "Daneel", "R. Daneel Olivaw"] 
+    # Devent -> ["R. Daneel Olivaw", "Julius Enderby", "Enderby", "Daneel"]
+    unique_names.sort(key=lambda x: len(x), reverse=True)
 
-    # Index multi-mots / mono-token
-    multiword = [n for n in characters if " " in n.strip()]
-    single = [n for n in characters if " " not in n.strip()]
+    for i, long_name in enumerate(unique_names):
+        long_parts = set(long_name.lower().split())
+        
+        # On compare avec tous les noms plus courts suivants
+        for j in range(i + 1, len(unique_names)):
+            short_name = unique_names[j]
+            short_parts = set(short_name.lower().split())
 
-    def is_sub_token(short: str, long: str) -> bool:
-        return short.lower() in long.lower().split()
+            # Si le nom court est contenu strictement dans le nom long
+            # Ex: {"enderby"} est un sous-ensemble de {"julius", "enderby"}
+            # Mais attention : on évite les fusions trop courtes (1 lettre) ou identiques
+            if len(short_name) > 2 and short_parts.issubset(long_parts):
+                
+                # C'est un match ! "Enderby" devient un alias de "Julius Enderby"
+                
+                # On met à jour la map principale :
+                # Tous ceux qui pointaient vers 'short_name' pointent maintenant vers 'long_name'
+                for original_key, current_target in alias.items():
+                    if current_target == short_name:
+                        alias[original_key] = long_name
+                        
+    # -------------------------------------------------------------------
 
-    for s in single:
-        cands = [mw for mw in multiword if is_sub_token(s, mw)]
-        if not cands:
-            continue
-        scored = [(mw, pair_counter[(s, mw)]) for mw in cands]
-        if not scored:
-            continue
-        scored.sort(key=lambda x: x[1], reverse=True)
-        mw_best, c_best = scored[0]
-        if c_best > 0 and (len(scored) == 1 or c_best >= 2 * scored[1][1]):
-            alias[s] = alias.get(mw_best, mw_best)
+    # 2) Statistiques de co-occurrence (pour les surnoms comme "Le Commissaire")
+    
+    # On recalcule les paires basées sur les nouveaux alias fusionnés
+    mapped_links = []
+    for a, b in raw_links:
+        mapped_links.append((alias.get(a, a), alias.get(b, b)))
 
+    pair_counter = Counter(mapped_links) + Counter((b, a) for (a, b) in mapped_links)
+    
+    # On tente de lier les noms restants qui n'ont pas été fusionnés par inclusion
+    # (Par exemple "Le Commissaire" -> "Julius Enderby")
     add_dominant_alias_by_ratio(alias, pair_counter, ratio_thresh=0.50, min_count=3, gap=2)
+
+    # 3) Nettoyage final des chaînes d'alias (A->B->C  ==> A->C)
+    def find_canon(x: str) -> str:
+        seen = set()
+        while x in alias and alias[x] != x and alias[x] not in seen:
+            seen.add(x)
+            x = alias[x]
+        return alias.get(x, x)
+
+    for k in list(alias.keys()):
+        alias[k] = find_canon(alias[k])
+
+    return alias
 
     def find_canon(x: str) -> str:
         seen = set()
