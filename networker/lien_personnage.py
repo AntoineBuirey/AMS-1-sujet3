@@ -4,6 +4,10 @@ import os
 import unicodedata
 from typing import List, Dict, Tuple
 
+from gamuLogger import Logger
+
+Logger.set_module("linker")
+
 # ------------------ tokenisation/normalisation ------------------
 PUNCT = ".,;:!?\"'()[]{}<>«»“”‘’—-–…"
 
@@ -27,8 +31,10 @@ def tokenize_text(text: str) -> List[str]:
     )
 
 # ------------------ multi-mots pour personnages ------------------
-def prepare_character_forms(characters: List[str]) -> Dict[str, List[str]]:
+def prepare_character_forms(characters: List[str]) -> Dict[str, List[str]]: 
     name_to_parts: Dict[str, List[str]] = {}
+    PARTICLES = {"de", "du", "des", "von", "van", "le", "la"}  # particules nobles
+    
     for name in characters:
         parts = re.findall(
             r"[A-Za-zÀ-ÖØ-öø-ÿ0-9]+'?[A-Za-zÀ-ÖØ-öø-ÿ0-9]+|"
@@ -36,7 +42,8 @@ def prepare_character_forms(characters: List[str]) -> Dict[str, List[str]]:
             r"[A-Za-zÀ-ÖØ-öø-ÿ0-9]+",
             name
         )
-        parts = [lower_norm(p) for p in parts if p]
+        # Conserver les particules dans les noms
+        parts = [lower_norm(p) for p in parts if p and (len(p) > 1 or p. lower() in PARTICLES)]
         if parts:
             name_to_parts[name] = parts
     return name_to_parts
@@ -64,7 +71,8 @@ def build_raw_links(characters: List[str],
                     window: int = 25,
                     undirected: bool = True,
                     unique_per_window: bool = True) -> List[Tuple[str, str]]:
-    occ_map = {name: find_occurrences_multi(tokens, name_to_parts[name]) for name in characters}
+    Logger.debug(f"{name_to_parts}\n{characters}")
+    occ_map = {name: find_occurrences_multi(tokens, name_to_parts[name]) for name in characters if name in name_to_parts}
     links: List[Tuple[str, str]] = []
     for a in characters:
         occ_a = occ_map.get(a, [])
@@ -139,43 +147,28 @@ def add_dominant_alias_by_ratio(
             alias[name] = alias.get(top_name, top_name)
 
 def infer_alias_map(characters: List[str], raw_links: List[Tuple[str, str]]) -> Dict[str, str]:
-    alias: Dict[str, str] = {}
-
-    # 1) Normalisation initiale de la casse (Pretty Case)
-    # Ex: "julius enderby" -> "Julius Enderby"
+    alias:  Dict[str, str] = {}
+    
+    # 1) Normalisation avec Pretty Case
     for name in characters:
-        alias[name] = pretty_case(name.lower())
-
-    # ---  ÉTAPE : FUSION STRICTE PAR INCLUSION (Force Merge) ---
-    # On récupère la liste unique des noms normalisés
+        alias[name] = pretty_case(name. lower())
+    
+    # 2) Détection des prénoms/noms seuls
     unique_names = list(set(alias.values()))
     
-    # On trie par longueur décroissante (les noms les plus longs en premier)
-    # Ex: ["Julius Enderby", "Enderby", "Daneel", "R. Daneel Olivaw"] 
-    # Devent -> ["R. Daneel Olivaw", "Julius Enderby", "Enderby", "Daneel"]
-    unique_names.sort(key=lambda x: len(x), reverse=True)
-
-    for i, long_name in enumerate(unique_names):
-        long_parts = set(long_name.lower().split())
-        
-        # On compare avec tous les noms plus courts suivants
-        for j in range(i + 1, len(unique_names)):
-            short_name = unique_names[j]
-            short_parts = set(short_name.lower().split())
-
-            # Si le nom court est contenu strictement dans le nom long
-            # Ex: {"enderby"} est un sous-ensemble de {"julius", "enderby"}
-            # Mais attention : on évite les fusions trop courtes (1 lettre) ou identiques
-            if len(short_name) > 2 and short_parts.issubset(long_parts):
-                
-                # C'est un match ! "Enderby" devient un alias de "Julius Enderby"
-                
-                # On met à jour la map principale :
-                # Tous ceux qui pointaient vers 'short_name' pointent maintenant vers 'long_name'
-                for original_key, current_target in alias.items():
-                    if current_target == short_name:
-                        alias[original_key] = long_name
-                        
+    # Séparer les noms simples (1 mot) des noms composés
+    simple_names = [n for n in unique_names if len(n. split()) == 1]
+    compound_names = [n for n in unique_names if len(n. split()) > 1]
+    
+    # Ne fusionner que si le nom simple apparaît DANS le nom composé
+    # ET s'il n'y a qu'un seul match possible
+    for simple in simple_names:
+        matches = [c for c in compound_names if simple in c. split()]
+        if len(matches) == 1:  # Fusion uniquement si pas d'ambiguïté
+            # Remplacer toutes les occurrences
+            for key, val in alias.items():
+                if val == simple:
+                    alias[key] = matches[0]
     # -------------------------------------------------------------------
 
     # 2) Statistiques de co-occurrence (pour les surnoms comme "Le Commissaire")

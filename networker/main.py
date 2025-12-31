@@ -229,6 +229,8 @@ def compute_promotion_demotion(proper_token_count, nonproper_lower_count, proper
 # --------- PASS B: final tagging ---------
 def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]], promoted_tokens: set, promoted_bigrams: set, auto_demote_tokens: set, store_unknow_verb : str|None = None) -> list[dict]:
     result = []
+    potential_persons = defaultdict(int)  # Track potential persons
+    
     for item in prepared:
         tokens = item["tokens"]
         if not isinstance(tokens, list) or not tokens:
@@ -282,6 +284,14 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                     noun_type, reason = guess_noun_type(tokens, words_list_dict, j, token_type)
                     token_data["noun_type"] = noun_type.value
                     token_data["noun_type_reason"] = reason
+                    
+                    # Log potential persons
+                    if noun_type.value == "person":
+                        potential_persons[tok] += 1
+                    elif token_type == TokenType.PROPER_NOUN:
+                        # Log proper nouns that weren't classified as persons
+                        Logger.info(f"Proper noun NOT classified as person: '{tok}' (reason: {reason})")
+                        
                 elif token_type == TokenType.VERB:
                     verb_data = get_verb_data(tok, words_list_dict, j)
                     token_data['verb_data'] = {
@@ -300,6 +310,12 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                 "page_index": item["page_index"],
                 "words": words_list_dict
             })
+    
+    # Log summary of potential persons
+    Logger.info(f"Found {len(potential_persons)} potential person entities")
+    sorted_persons = sorted(potential_persons.items(), key=lambda x: x[1], reverse=True)
+    Logger.debug(f"Top 20 potential persons:\n" + "\n".join([f"  {name}: {count}" for name, count in sorted_persons[:20]]))
+    
     return result
 
 def merge_determiners_nouns(result: list[dict]) -> list[dict]:
@@ -378,7 +394,7 @@ def build_characters_graph(input_file: str,
         input_file,
         list(word_count.keys()),
         aggregated=True,   
-        window=50,
+        window=75,
         min_count=1
     )
     
@@ -475,6 +491,7 @@ def main():
         df = df[["ID", "graphml"]]
         # Write CSV without index (Kaggle expects only ID,graphml)
         df.to_csv("./output/my_submission.csv", index=False)
+        Logger.info("Wrote output csv to output/my_submission.csv")
 
 
 if __name__ == "__main__":

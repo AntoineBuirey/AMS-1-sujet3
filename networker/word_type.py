@@ -188,12 +188,19 @@ PLACE_DETERMINERS = [
     "à", "de", "en", "au", "aux", "du", "des", "dans", "vers", "chez"
 ]
 PERSON_DETERMINERS = [
-    "m.", "mme", "dr", "prof", "monsieur", "madame", "mademoiselle"
+    "m.", "mme", "mlle", "dr", "prof", "monsieur", "madame", "mademoiselle",
+    "capitaine", "colonel", "général", "lieutenant", "sergent",
+    "maître", "père", "frère", "sœur", "oncle", "tante",
+    "roi", "reine", "prince", "princesse", "duc", "duchesse",
+    "lord", "lady", "sir", "dame"
 ]
 
 # these verbs imply that a person is the next noun
 VERBS_INTRODUCING_PERSONS = [
-    "rencontrer", "aider", "trouver", "connaître"
+    "rencontrer", "aider", "trouver", "connaître",
+    "voir", "apercevoir", "croiser", "saluer", "appeler", "nommer",
+    "présenter", "interroger", "questionner", "observer", "regarder",
+    "écouter", "entendre", "parler", "dire", "répondre", "demander"
 ]
 
 
