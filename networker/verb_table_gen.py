@@ -7,7 +7,7 @@ from typing import TypeVar
 from .verbs_engine import VerbTree, VerbData, mood_map, tense_map, pronoun_map
 from .utils import resource
 
-client = genai.Client(api_key="AIzaSyCjmmCPI7RjpRRlxwCUEfs8BbZS1mbL8b8")
+client = genai.Client()
 
 INFINITIVES_FILE = resource("missing_verbs.txt")
 
