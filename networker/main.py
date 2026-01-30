@@ -290,7 +290,7 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                         potential_persons[tok] += 1
                     elif token_type == TokenType.PROPER_NOUN:
                         # Log proper nouns that weren't classified as persons
-                        Logger.info(f"Proper noun NOT classified as person: '{tok}' (reason: {reason})")
+                        Logger.debug(f"Proper noun NOT classified as person: '{tok}' (reason: {reason})")
                         
                 elif token_type == TokenType.VERB:
                     verb_data = get_verb_data(tok, words_list_dict, j)
