@@ -31,7 +31,8 @@ def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) 
         if canon2 is None:
             raise ValueError(f"Person {person2} not found in persons list")
         if G.has_edge(canon1, canon2):
-            raise ValueError(f"Edge between {canon1} and {canon2} already exists")
+            # raise ValueError(f"Edge between {canon1} and {canon2} already exists")
+            G[canon1][canon2]['weight'] += weight
         else:
             G.add_edge(canon1, canon2, weight=weight)
 
