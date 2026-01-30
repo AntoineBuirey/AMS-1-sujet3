@@ -8,6 +8,7 @@ from gamuLogger import Logger
 from .verbs_engine import VerbTree, VerbData, Pronoun, pronoun_map, Mood, Tense
 from .utils import resource, Cache
 from .standardizer import trim_punctuation
+from .spacy_helper import spacy_label_for_token
 
 Logger.set_module("word_type")
 
@@ -107,8 +108,13 @@ PERSON_PREPOSITIONS = [
 
 # Special case: Encyclopaedia Galactica should never be classified as a person
 SPECIAL_NON_PERSON_TOKENS = [
-    "encyclopaedia ","galactica",
-    "encyclopaedia_galactica","mycogène","terra","galactica2"," galactica"
+    "encyclopaedia",
+    "galactica",
+    "encyclopaedia_galactica",
+    "encyclopaedia galactica",
+    "mycogène",
+    "terra",
+    "galactica2",
 ]
 
 
@@ -562,8 +568,23 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
         if (index > 0 and sentence[index-1] == ",") and \
            (index + 1 < len(sentence) and sentence[index+1] in [",", ".", ";", "!", "?"]):
             return NounType.PERSON, "between commas or comma and sentence end"
-                
-                
+
+        # --- spaCy vote (hybrid rules + NER) ---
+        # Helps reduce false characters and recover missed person entities.
+        spacy_label = spacy_label_for_token(sentence, index)
+
+        # If spaCy strongly indicates a person, promote to PERSON.
+        if spacy_label == "PER":
+            return NounType.PERSON, "spacy vote PER"
+
+        # If spaCy indicates a location, promote to PLACE.
+        if spacy_label == "LOC":
+            return NounType.PLACE, "spacy vote LOC"
+
+        # If spaCy indicates ORG/MISC, avoid mislabeling as PERSON.
+        if spacy_label in {"ORG", "MISC"}:
+            return NounType.UNKNOWN, f"spacy vote {spacy_label}"
+
         return NounType.UNKNOWN, "no specific clues found"
     
     elif word_type == TokenType.COMMON_NOUN:
