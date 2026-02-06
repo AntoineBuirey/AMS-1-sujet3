@@ -19,13 +19,16 @@ def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) 
     G = nx.Graph()
     for person in persons:
         aliases = ";".join(capitalize_all_words(n) for n in person)
-        id = person[0].replace(" ", "_")
+        # id = person[0].replace(" ", "_")
+        id = person[0]
         G.add_node(id, names=aliases)
         
     for person1, person2, weight in links:
         # find the canonical names
-        canon1 = next((p[0].replace(" ", "_") for p in persons if person1 in p), None)
-        canon2 = next((p[0].replace(" ", "_") for p in persons if person2 in p), None)
+        # canon1 = next((p[0].replace(" ", "_") for p in persons if person1 in p), None)
+        # canon2 = next((p[0].replace(" ", "_") for p in persons if person2 in p), None)
+        canon1 = next((p[0] for p in persons if person1 in p), None)
+        canon2 = next((p[0] for p in persons if person2 in p), None)
         if canon1 is None:
             raise ValueError(f"Person {person1} not found in persons list")
         if canon2 is None:
