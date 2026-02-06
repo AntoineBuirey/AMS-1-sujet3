@@ -26,8 +26,10 @@ dependencies = [
 "python-dateutil==2.9.0.post0",
 "regex==2025.11.3",
 "six==1.17.0",
+"spacy>=3.8.11",
 "tqdm==4.67.1",
-"pandas==2.2.3" 
+"pandas==2.2.3",
+"fr_core_news_sm==3.8.0@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl"
 ]
 [project.optional-dependencies]
 ai = ["google-genai"]

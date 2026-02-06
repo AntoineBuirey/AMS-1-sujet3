@@ -398,9 +398,6 @@ def build_characters_graph(input_file: str,
         min_count=1
     )
     
-    aliases = lowercase(aliases)
-    link_table = lowercase(link_table)
-    
     output_dir = get_output_dir(book_code, chapter_number)
     
     if save_intermediate:

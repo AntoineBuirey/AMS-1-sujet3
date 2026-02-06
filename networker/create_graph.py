@@ -25,13 +25,14 @@ def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) 
         
     for person1, person2, weight in links:
         # find the canonical names
-        # canon1 = next((p[0].replace(" ", "_") for p in persons if person1 in p), None)
-        # canon2 = next((p[0].replace(" ", "_") for p in persons if person2 in p), None)
+        Logger.debug(f"Finding canonical names for '{person1}' and '{person2}'")
         canon1 = next((p[0] for p in persons if person1 in p), None)
         canon2 = next((p[0] for p in persons if person2 in p), None)
         if canon1 is None:
+            Logger.debug(f"Persons list: {persons}")
             raise ValueError(f"Person {person1} not found in persons list")
         if canon2 is None:
+            Logger.debug(f"Persons list: {persons}")
             raise ValueError(f"Person {person2} not found in persons list")
         if G.has_edge(canon1, canon2):
             # raise ValueError(f"Edge between {canon1} and {canon2} already exists")

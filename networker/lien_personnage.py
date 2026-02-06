@@ -96,18 +96,6 @@ def build_raw_links(characters: List[str],
                         break
     return links
 
-# ------------------ alias automatiques ------------------
-def pretty_case(name: str) -> str:
-    """Capitalize correctement, en corrigeant les initiales ('r.' -> 'R.')."""
-    toks = name.split()
-    out = []
-    for t in toks:
-        if len(t) == 2 and t[1] == "." and t[0].isalpha():
-            out.append(t[0].upper() + ".")
-        else:
-            out.append(t[:1].upper() + t[1:].lower() if t else t)
-    return " ".join(out)
-
 def add_dominant_alias_by_ratio(
     alias: Dict[str, str],
     pair_counter: Counter,
@@ -151,7 +139,8 @@ def infer_alias_map(characters: List[str], raw_links: List[Tuple[str, str]]) -> 
     
     # 1) Normalisation avec Pretty Case
     for name in characters:
-        alias[name] = pretty_case(name. lower())
+        # alias[name] = pretty_case(name.lower())
+        alias[name] = name
     
     # 2) Détection des prénoms/noms seuls
     unique_names = list(set(alias.values()))
@@ -211,11 +200,6 @@ def canonicalize_links(raw_links: List[Tuple[str, str]],
             A, B = B, A
         agg[(A, B)] += 1
     return agg
-# def load_wordcount(file_path: str) -> list[str]:
-#     """Charger la liste des personnages depuis le fichier JSON."""
-#     with open(file_path, "r", encoding="utf-8") as f:
-#         data = json.load(f)
-#     return list(data.keys())
 
 
 def build_links_file(
@@ -234,11 +218,6 @@ def build_links_file(
     """
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Fichier texte {input_file} introuvable.")
-
-    prefix = os.path.splitext(os.path.basename(input_file))[0]
-    # wordcount_file = f"output/{prefix}.wordcount.json"
-    # if not os.path.exists(wordcount_file):
-    #     raise FileNotFoundError(f"Fichier JSON {wordcount_file} introuvable.")
 
     # Charger texte + personnages
     with open(input_file, "r", encoding="utf-8") as f:
