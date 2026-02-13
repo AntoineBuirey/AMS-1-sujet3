@@ -1,5 +1,10 @@
 from gamuLogger import Logger
+import json
+import os
+import re
 
+# Chemin vers ton fichier JSON contenant les listes d'alias
+ALIAS_MAP_PATH = "networker/data/alias_map.json"
 
 def part_score(part1: str, part2: str) -> float:
     """
@@ -32,70 +37,128 @@ def part_score(part1: str, part2: str) -> float:
     
 
 
-def match_scores(name1: str, name2: str) -> float:
-    """
-    Compute a match score between two names.
-    the score is a number between 0 and 1, the higher mean the names are probably aliases.
-    """
-    Logger.trace(f"Matching '{name1}' against '{name2}'")
-    name1_parts = name1.lower().split()
-    name2_parts = name2.lower().split()
-    
-    Logger.trace(f"Parts: {name1_parts} vs {name2_parts}")
-    
-    if name1.lower() in name2_parts or name2.lower() in name1_parts:
-        Logger.trace("One name is a part of the other, score: 1.0")
-        return 1.0
-    
-    if not name1_parts or not name2_parts:
-        Logger.trace("One of the names has no parts, score: 0.0")
-        return 0.0
-    scores = []
-    for part1 in name1_parts:
-        best_score = 0.0
-        for part2 in name2_parts:
-            score = part_score(part1, part2)
-            if score > best_score:
-                best_score = score
-        scores.append(best_score)
-    final_score = sum(scores) / len(scores)
-    Logger.trace(f"Final score: {final_score}")
-    return final_score
 
+# =========================
+# Normalisation
+# =========================
 
-def resolve_aliases(persons : list[str]) -> list[list[str]]:
+def normalize_name(name: str) -> str:
     """
-    Resolve aliases from a list of person names.
-    Return a list of lists of aliases.
+    Normalise un nom pour la comparaison :
+    - minuscules
+    - remplace "_" par espace
+    - supprime la ponctuation
+    - réduit les espaces multiples
     """
-    aliases : list[tuple[str, str]] = []
-    n = len(persons)
-    for i in range(n):
-        for j in range(i + 1, n):
-            score = match_scores(persons[i], persons[j])
-            Logger.trace(f"Comparing '{persons[i]}' and '{persons[j]}', score: {score}")
-            if score >= 0.75:
-                aliases.append((persons[i], persons[j]))
-    
-    # Build groups of aliases
-    alias_groups : list[set[str]] = []
-    for alias1, alias2 in aliases:
+    if not name:
+        return ""
+    name = name.lower().replace("_", " ")
+    name = re.sub(r"[^\w\s]", "", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name
+
+# =========================
+# Chargement des Alias Manuels
+# =========================
+
+def load_alias_map() -> list[list[str]]:
+    """
+    Charge les groupes d'alias manuels depuis data/alias_map.json
+    """
+    if not os.path.exists(ALIAS_MAP_PATH):
+        Logger.warning(f"Fichier d'alias non trouvé : {ALIAS_MAP_PATH}")
+        return []
+
+    try:
+        with open(ALIAS_MAP_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if isinstance(data, list):
+            # On normalise chaque nom dans les groupes pour assurer la correspondance
+            return [
+                [normalize_name(name) for name in group]
+                for group in data
+                if isinstance(group, list) and group
+            ]
+        return []
+
+    except Exception as e:
+        Logger.error(f"Erreur lors du chargement de l'alias map : {e}")
+        return []
+
+# =========================
+# Logique de Résolution
+# =========================
+
+def resolve_aliases(persons: list[str]) -> list[list[str]]:
+    """
+    Prend une liste de noms de personnages et regroupe les alias.
+    """
+    manual_groups = load_alias_map()
+    normalized_persons = [normalize_name(p) for p in persons]
+    alias_pairs = []
+
+    # 1. Identifier les paires d'alias
+    for i, name1 in enumerate(persons):
+        norm1 = normalized_persons[i]
+        for j in range(i + 1, len(persons)):
+            name2 = persons[j]
+            norm2 = normalized_persons[j]
+
+            # --- ÉTAPE A : VÉRIFICATION MANUELLE (Priorité) ---
+            is_manual_match = False
+            for group in manual_groups:
+                if norm1 in group and norm2 in group:
+                    alias_pairs.append((name1, name2))
+                    is_manual_match = True
+                    break
+            
+            if is_manual_match:
+                continue # On passe au couple suivant, on ignore les règles auto
+
+            # --- ÉTAPE B : SÉCURITÉ (Prevent weak matches) ---
+            # On ne fusionne pas automatiquement deux noms d'un seul mot 
+            # (sauf s'ils étaient dans la liste manuelle ci-dessus)
+            if len(norm1.split()) == 1 and len(norm2.split()) == 1:
+                continue
+
+            # --- ÉTAPE C : SIMILARITÉ AUTOMATIQUE (Optionnel) ---
+            # Ici tu peux ajouter ton calcul de score (ex: Levenshtein ou Jaro-Winkler)
+            # score = match_scores(norm1, norm2)
+            # if score >= 0.75:
+            #     alias_pairs.append((name1, name2))
+
+    # 2. Construire les groupes finaux à partir des paires
+    final_groups: list[set[str]] = []
+
+    # D'abord, on initialise les groupes avec tes listes manuelles
+    # pour être sûr qu'ils existent même si certains noms ne sont pas dans le texte
+    for m_group in manual_groups:
+        # On ne garde que les noms qui sont réellement présents dans 'persons'
+        existing_in_text = {p for p, n in zip(persons, normalized_persons) if n in m_group}
+        if existing_in_text:
+            final_groups.append(existing_in_text)
+
+    # Ensuite on ajoute les paires détectées (auto ou manuelles)
+    for a1, a2 in alias_pairs:
         found_group = None
-        for group in alias_groups:
-            if alias1 in group or alias2 in group:
+        for group in final_groups:
+            if a1 in group or a2 in group:
                 if found_group is None:
+                    group.update([a1, a2])
                     found_group = group
-                    group.add(alias1)
-                    group.add(alias2)
                 else:
+                    # Fusion de deux groupes si une liaison est trouvée
                     found_group.update(group)
-                    alias_groups.remove(group)
+                    final_groups.remove(group)
+        
         if found_group is None:
-            alias_groups.append(set([alias1, alias2]))
-        
-    # add singletons
+            final_groups.append({a1, a2})
+
+    # Ajouter les personnages isolés (singletons)
     for person in persons:
-        if not any(person in group for group in alias_groups):
-            alias_groups.append(set([person]))
-        
-    return [list(group) for group in alias_groups]
+        if not any(person in group for group in final_groups):
+            final_groups.append({person})
+
+    # Convertir en liste de listes pour le retour
+    return [list(group) for group in final_groups]
