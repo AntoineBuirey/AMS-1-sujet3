@@ -37,6 +37,9 @@ def create_graph(persons : list[list[str]], links : list[tuple[str, str, int]]) 
         if G.has_edge(canon1, canon2):
             # raise ValueError(f"Edge between {canon1} and {canon2} already exists")
             G[canon1][canon2]['weight'] += weight
+        elif canon1 == canon2:
+            # skip self-loops
+            Logger.debug(f"Skipping self-loop for {canon1}")
         else:
             G.add_edge(canon1, canon2, weight=weight)
 

@@ -270,19 +270,9 @@ class VerbTree:
         verb_node = VerbNode(data)
         current_node.add_child(verb_node)
     
-    def search(self, verb : str) -> bool:
-        current_node = self.root
-        for char in verb:
-            if current_node is None:
-                return False
-            current_node = current_node.get_child(char)
-        if current_node is None:
-            return False
-        # Check if there's a verb node among the children
-        for child in current_node.children.values():
-            if child.is_verb():
-                return True
-        return False
+    def search(self, verb : str, strict : bool = True) -> bool:
+        return len(self.get(verb, strict)) > 0
+       
     
     def exist(self, conjugated_form : str, verb_data : VerbData) -> bool:
         current_node = self.root
@@ -316,6 +306,7 @@ class VerbTree:
         yield from traverse(self.root, "")
     
     def get(self, verb : str, strict : bool = True) -> list[VerbData]:
+        verb = verb.lower()
         if strict:
             return self.__get_strict(verb)
         else:

@@ -116,7 +116,7 @@ def health(only_errors: bool = False):
 
 def has(verb_to_check: str):
     """Check if a verb exists in the tree. Usage: has <verb>"""
-    exists = tree.search(verb_to_check)
+    exists = tree.search(verb_to_check, False)
     if exists:
         print(f"The verb '{verb_to_check}' exists in the tree.")
     else:

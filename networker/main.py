@@ -281,7 +281,13 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                     "type": token_type.value
                 }
                 if token_type in {TokenType.PROPER_NOUN, TokenType.COMMON_NOUN}:
-                    noun_type, reason = guess_noun_type(tokens, words_list_dict, j, token_type)
+                    maybe_incomplete_sentence : bool = item["maybe_incomplete"] #type: ignore
+                    try:
+                        noun_type, reason = guess_noun_type(tokens, words_list_dict, j, token_type, maybe_incomplete_sentence)
+                    except Exception as e:
+                        Logger.error(f"Error guessing noun type for token '{tok}' in sentence '{item['full_sentence']}' (index {j}): {e}")
+                        Logger.error(words_list_dict)
+                        raise
                     token_data["noun_type"] = noun_type.value
                     token_data["noun_type_reason"] = reason
                     
