@@ -116,7 +116,7 @@ def get_nlp() -> Language:
     Adds an EntityRuler for domain entities.
     """
     # Try the better model first if installed.
-    for model in ("fr_core_news_lg", "fr_core_news_md", "fr_core_news_sm"):
+    for model in ( "fr_core_news_md", "fr_core_news_lg","fr_core_news_sm"):
         try:
             nlp = spacy.load(model)
             break
