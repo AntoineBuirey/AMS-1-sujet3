@@ -16,24 +16,46 @@ from spacy.language import Language
 # We use an EntityRuler to boost recall on PER/LOC/ORG for this corpus.
 # You can extend these lists safely.
 FOUNDATION_PER: Sequence[str] = (
-    "hari seldon",
-    "seldon",
-    "dors",
-    "daneel",
-    "r. daneel",
-    "r daneel",
-    "elijah baley",
-    "baley",
-    "cleon",
-    "demerzel",
-    "hummin",
-    "raych",
-    "amaryl",
+    # PAF — Prélude à Fondation
+    "hari seldon", "seldon", "hari",
+    "dors venabili", "dors",
+    "eto demerzel", "demerzel", "hummin",
+    "cleon", "cléon",
+    "yugo amaryl", "amaryl",
+    "raych seldon", "raych",
+    "sunmaster douze", "sunmaster",
+    "alban wellis", "wellis",
+    # LCA — Les Cavernes d'Acier
+    "elijah baley", "baley", "lije",
+    "r. daneel olivaw", "r. daneel", "r daneel", "daneel", "daneel olivaw",
+    "julius enderby", "enderby", "julius",
+    "han fastolfe", "fastolfe",
+    "roj nemennuh sarton", "sarton",
+    "r. sammy", "r sammy",
+    "vince barrett", "barrett",
+    "jessie baley", "jessie",
+    "bentley baley", "bentley",
+    "gladia delmarre", "gladia",
+    # Fondation (tomes suivants)
+    "salvor hardin", "hardin",
+    "hober mallow", "mallow",
+    "lewis pirenne", "pirenne",
+    "gaal dornick", "dornick",
+    "bayta darell", "bayta",
+    "toran darell", "toran",
+    "ebling mis", "mis",
+    "han pritcher", "pritcher",
+    "arcadia darell", "arcadia",
+    "homir munn", "munn",
+    "pelleas anthor", "anthor",
+    "bail channis", "channis",
+    "preem palver", "palver",
+    "duem barr", "barr",
 )
 
 FOUNDATION_LOC: Sequence[str] = (
-    "trantor",
-    "helicon",
+    "trantor", "helicon", "terminus", "kalgan",
+    "aurora", "solaria", "anacreon", "smyrno",
 )
 
 FOUNDATION_ORG: Sequence[str] = (
@@ -94,7 +116,7 @@ def get_nlp() -> Language:
     Adds an EntityRuler for domain entities.
     """
     # Try the better model first if installed.
-    for model in ("fr_core_news_md", "fr_core_news_sm"):
+    for model in ("fr_core_news_lg", "fr_core_news_md", "fr_core_news_sm"):
         try:
             nlp = spacy.load(model)
             break

@@ -3,22 +3,20 @@ import json
 import os
 import re
 
-# Chemin vers ton fichier JSON contenant les listes d'alias
 ALIAS_MAP_PATH = "networker/data/alias_map.json"
 
+PARTICLES = {"de", "du", "des", "von", "van", "le", "la", "les", "l", "d"}
+TITLES    = {"mr", "mme", "dr", "m", "sir", "dame", "capitaine",
+             "lieutenant", "sergent", "professeur", "prof", "maitre"}
+
+
 def part_score(part1: str, part2: str) -> float:
-    """
-    Compute a score between two name parts.
-    the score is a number between 0 and 1, the higher mean the parts are probably the same.
-    Using the Levenshtein distance to compute the score.
-    """
     if part1 == part2:
         return 1.0
-    # Compute Levenshtein distance
     len1, len2 = len(part1), len(part2)
-    if len1 == 0:
+    if len1 == 0 or len2 == 0:
         return 0.0
-    if len2 == 0:
+    if min(len1, len2) / max(len1, len2) < 0.5:
         return 0.0
     dp = [[0] * (len2 + 1) for _ in range(len1 + 1)]
     for i in range(len1 + 1):
@@ -28,28 +26,11 @@ def part_score(part1: str, part2: str) -> float:
     for i in range(1, len1 + 1):
         for j in range(1, len2 + 1):
             cost = 0 if part1[i - 1] == part2[j - 1] else 1
-            dp[i][j] = min(dp[i - 1][j] + 1,      # deletion
-                           dp[i][j - 1] + 1,      # insertion
-                           dp[i - 1][j - 1] + cost) # substitution
-    distance = dp[len1][len2]
-    max_len = max(len1, len2)
-    return (max_len - distance) / max_len
-    
+            dp[i][j] = min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+    return (max(len1, len2) - dp[len1][len2]) / max(len1, len2)
 
-
-
-# =========================
-# Normalisation
-# =========================
 
 def normalize_name(name: str) -> str:
-    """
-    Normalise un nom pour la comparaison :
-    - minuscules
-    - remplace "_" par espace
-    - supprime la ponctuation
-    - réduit les espaces multiples
-    """
     if not name:
         return ""
     name = name.lower().replace("_", " ")
@@ -57,108 +38,142 @@ def normalize_name(name: str) -> str:
     name = re.sub(r"\s+", " ", name).strip()
     return name
 
-# =========================
-# Chargement des Alias Manuels
-# =========================
+
+def strip_article(norm: str) -> str:
+    """
+    Supprime l'article défini en tête pour permettre la fusion de variantes.
+    Cas compacte (apostrophe supprimée par normalize_name) :
+      normalize_name("l'Empereur") → "lempereur"  → strip → "empereur"
+      normalize_name("L'Empereur") → "lempereur"  → strip → "empereur"
+      normalize_name("Empereur")   → "empereur"   → strip → "empereur"
+    Cas avec espace :
+      "le commissaire" → "commissaire"
+      "la reine"       → "reine"
+    """
+    # Cas compacte : "l" ou "d" collé (apostrophe supprimée)
+    for prefix in ("l", "d"):
+        if norm.startswith(prefix) and len(norm) > len(prefix) + 1:
+            candidate = norm[len(prefix):]
+            if len(candidate) >= 3:
+                norm = candidate
+                break
+    # Cas avec espace
+    for article in ("le ", "la ", "les ", "un ", "une ", "des ", "du "):
+        if norm.startswith(article):
+            norm = norm[len(article):]
+            break
+    return norm.strip()
+
+
+def _meaningful_tokens(norm: str) -> list[str]:
+    return [t for t in norm.split() if t not in PARTICLES and t not in TITLES and len(t) > 1]
+
 
 def load_alias_map() -> list[list[str]]:
-    """
-    Charge les groupes d'alias manuels depuis data/alias_map.json
-    """
     if not os.path.exists(ALIAS_MAP_PATH):
         Logger.warning(f"Fichier d'alias non trouvé : {ALIAS_MAP_PATH}")
         return []
-
     try:
         with open(ALIAS_MAP_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-
         if isinstance(data, list):
-            # On normalise chaque nom dans les groupes pour assurer la correspondance
             return [
                 [normalize_name(name) for name in group]
                 for group in data
                 if isinstance(group, list) and group
             ]
         return []
-
     except Exception as e:
         Logger.error(f"Erreur lors du chargement de l'alias map : {e}")
         return []
 
-# =========================
-# Logique de Résolution
-# =========================
 
-def resolve_aliases(persons: list[str]) -> list[list[str]]:
+def resolve_aliases(persons: list[str],
+                    word_count: dict[str, int] | None = None) -> list[list[str]]:
     """
-    Prend une liste de noms de personnages et regroupe les alias.
+    Regroupe les alias d'une liste de noms de personnages.
+
+    v3 — article stripping :
+    Fusionne les variantes avec/sans article : "l'Empereur", "L'Empereur", "Empereur"
+    deviennent un seul groupe car strip_article donne "empereur" dans les trois cas.
     """
     manual_groups = load_alias_map()
     normalized_persons = [normalize_name(p) for p in persons]
-    alias_pairs = []
+    stripped_persons   = [strip_article(n) for n in normalized_persons]
+    alias_pairs: list[tuple[str, str]] = []
 
-    # 1. Identifier les paires d'alias
     for i, name1 in enumerate(persons):
-        norm1 = normalized_persons[i]
-        for j in range(i + 1, len(persons)):
-            name2 = persons[j]
-            norm2 = normalized_persons[j]
+        norm1     = normalized_persons[i]
+        stripped1 = stripped_persons[i]
+        mtok1     = _meaningful_tokens(norm1)
 
-            # --- ÉTAPE A : VÉRIFICATION MANUELLE (Priorité) ---
-            is_manual_match = False
+        for j in range(i + 1, len(persons)):
+            name2     = persons[j]
+            norm2     = normalized_persons[j]
+            stripped2 = stripped_persons[j]
+            mtok2     = _meaningful_tokens(norm2)
+
+            # A — Alias manuel
+            is_manual = False
             for group in manual_groups:
                 if norm1 in group and norm2 in group:
                     alias_pairs.append((name1, name2))
-                    is_manual_match = True
+                    is_manual = True
                     break
-            
-            if is_manual_match:
-                continue # On passe au couple suivant, on ignore les règles auto
-
-            # --- ÉTAPE B : SÉCURITÉ (Prevent weak matches) ---
-            # On ne fusionne pas automatiquement deux noms d'un seul mot 
-            # (sauf s'ils étaient dans la liste manuelle ci-dessus)
-            if len(norm1.split()) == 1 and len(norm2.split()) == 1:
+            if is_manual:
                 continue
 
-            # --- ÉTAPE C : SIMILARITÉ AUTOMATIQUE (Optionnel) ---
-            # Ici tu peux ajouter ton calcul de score (ex: Levenshtein ou Jaro-Winkler)
-            # score = match_scores(norm1, norm2)
-            # if score >= 0.75:
-            #     alias_pairs.append((name1, name2))
+            # B — Sécurité mono-mot SAUF si stripped identique
+            # (ex : "Empereur" vs "l'Empereur" → stripped == "empereur" → OK)
+            if len(norm1.split()) == 1 and len(norm2.split()) == 1:
+                if stripped1 == stripped2 and len(stripped1) >= 3:
+                    alias_pairs.append((name1, name2))
+                continue
 
-    # 2. Construire les groupes finaux à partir des paires
+            # C — Fusion par article stripping
+            # "l'Empereur" (stripped="emperor") == "Empereur" (stripped="emperor")
+            if stripped1 == stripped2 and len(stripped1) >= 3:
+                alias_pairs.append((name1, name2))
+                continue
+
+            # D — Inclusion sûre
+            if mtok1 and mtok2:
+                if any(t in mtok2 for t in mtok1) or any(t in mtok1 for t in mtok2):
+                    alias_pairs.append((name1, name2))
+                    continue
+
+            # E — Levenshtein (0.92)
+            if part_score(norm1, norm2) >= 0.92:
+                alias_pairs.append((name1, name2))
+
     final_groups: list[set[str]] = []
 
-    # D'abord, on initialise les groupes avec tes listes manuelles
-    # pour être sûr qu'ils existent même si certains noms ne sont pas dans le texte
     for m_group in manual_groups:
-        # On ne garde que les noms qui sont réellement présents dans 'persons'
-        existing_in_text = {p for p, n in zip(persons, normalized_persons) if n in m_group}
-        if existing_in_text:
-            final_groups.append(existing_in_text)
+        existing = {p for p, n in zip(persons, normalized_persons) if n in m_group}
+        if existing:
+            final_groups.append(existing)
 
-    # Ensuite on ajoute les paires détectées (auto ou manuelles)
     for a1, a2 in alias_pairs:
         found_group = None
-        for group in final_groups:
+        for group in list(final_groups):
             if a1 in group or a2 in group:
                 if found_group is None:
                     group.update([a1, a2])
                     found_group = group
                 else:
-                    # Fusion de deux groupes si une liaison est trouvée
                     found_group.update(group)
                     final_groups.remove(group)
-        
+                    break
         if found_group is None:
             final_groups.append({a1, a2})
 
-    # Ajouter les personnages isolés (singletons)
     for person in persons:
-        if not any(person in group for group in final_groups):
+        if not any(person in g for g in final_groups):
             final_groups.append({person})
 
-    # Convertir en liste de listes pour le retour
-    return [list(group) for group in final_groups]
+    def sort_key(name: str) -> int:
+        if word_count:
+            return word_count.get(name, 0)
+        return len(name.split())
+
+    return [sorted(g, key=sort_key, reverse=True) for g in final_groups]

@@ -204,17 +204,21 @@ def canonicalize_links(raw_links: List[Tuple[str, str]],
 
 def build_links_file(
     input_file: str,
-    characters:List[str],
+    characters: List[str],
     *,
     window: int = 25,
     aggregated: bool = False,
     min_count: int = 1,
     directed: bool = False,
     unique_per_window: bool = True,
+    external_alias_map: Dict[str, str] | None = None,
 ) -> List[Tuple[str, str, int]]:
     """
     Génère le fichier de liens (brut ou agrégé) dans output/.
-    Identique au main d'avant, mais réutilisable.
+
+    Si external_alias_map est fourni (dict nom_brut -> nom_canonique), il est utilisé
+    directement et infer_alias_map est ignoré, évitant ainsi une double résolution
+    d'alias incohérente avec resolve_aliases().
     """
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Fichier texte {input_file} introuvable.")
@@ -222,7 +226,6 @@ def build_links_file(
     # Charger texte + personnages
     with open(input_file, "r", encoding="utf-8") as f:
         text = f.read()
-    # characters = load_wordcount(wordcount_file)
 
     # Tokens + formes multi-mots
     tokens = tokenize_text(text)
@@ -236,7 +239,14 @@ def build_links_file(
         unique_per_window=unique_per_window
     )
 
-    alias_map = infer_alias_map(characters, raw_links)
+    # Résolution d'alias : on utilise la map externe si fournie,
+    # sinon on recalcule en interne (comportement historique).
+    if external_alias_map is not None:
+        alias_map = external_alias_map
+        Logger.debug("Using external alias map (infer_alias_map skipped).")
+    else:
+        alias_map = infer_alias_map(characters, raw_links)
+
     pairs = canonicalize_links(raw_links, alias_map, undirected=not directed)
 
     result = []
