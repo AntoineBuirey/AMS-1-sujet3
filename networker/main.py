@@ -413,7 +413,7 @@ PERSON_BLACKLIST: frozenset[str] = frozenset({
     "dynastie entun",
     # ── Verbes à l'impératif mal classifiés (fréquent dans LCA) ──────────────
 "ecoute", "ecoutez", "ecoutez-", "reponds", "commandez",
-"etait-", "tais-toi",
+"etait-", "tais-toi","Fermez-","Réponds","Reponds-",
 # ── Lieux US détectés par spaCy ──────────────────────────────────────────
 "new jersey",
 # ── Organisations / mouvements ───────────────────────────────────────────
@@ -452,6 +452,11 @@ PERSON_BLACKLIST: frozenset[str] = frozenset({
 
 # ── Autres faux positifs ─────────────────────────────────────────────────
 "historienne", "renégat", "renegat",
+
+# Exemples d'artefacts OCR spécifiques à certains chapitres (souvent des noms coupés par un saut de ligne)
+"Mycélium Soixante-douze",
+        "Mycélium",
+        "Mycélium Soixante-",
 })
 
 
