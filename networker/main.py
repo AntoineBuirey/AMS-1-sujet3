@@ -30,6 +30,7 @@ from .alias_resolution import resolve_aliases
 from .create_graph import create_graph, save_img_graph, to_graphml
 from .lien_personnage import build_links_file
 from .utils import save_structure_data, get_output_dir, append_to_file, save_graphml_file
+from .spacy_helper import get_nlp
 
 
 # logger setup
@@ -38,8 +39,8 @@ Logger.set_module("main")
 
 # ===== Constants =====
 # Thresholds for promotion/demotion of proper-noun candidates
-PROMOTE_MIN_COUNT = 3        # min proper observations to consider a token
-PROMOTE_MIN_SCORE = 0.8     # proper / (proper + nonproper_lower)
+PROMOTE_MIN_COUNT = 2       # min proper observations to consider a token
+PROMOTE_MIN_SCORE = 0.7    # proper / (proper + nonproper_lower)
 PROMOTE_MIN_BIGRAM = 1      # min observations for a proper bigram
 
 DEMOTE_MIN_COUNT = 1        # minimum times seen in lowercase to be reliable
@@ -374,13 +375,144 @@ def get_book_chapter(input_file: str) -> tuple[str, int]:
     chapter_number = int(match.group(2))
     return book_code, chapter_number
     
+
+# =============================================================================
+# Blacklist : entités qui ne peuvent PAS être des personnages.
+# Guidelines du sujet : ethnonymes, lieux, artefacts OCR exclus.
+# =============================================================================
+PERSON_BLACKLIST: frozenset[str] = frozenset({
+    # ── Lieux (PAF + LCA) ────────────────────────────────────────────────────
+    "trantor", "terminus", "helicon", "anacreon", "mycogene", "mycogène",
+    "kalgan", "korell", "askone", "smyrno", "sayshell", "gaia",
+    "spacetown", "aurora", "solaria", "comporellon",
+    # ── Ethnonymes / démonymes (explicitement exclus par les guidelines) ──────
+    "spaciens", "spacien", "spacienne", "spaciennes",
+    "terriens", "terrien", "terrienne",
+    "galactiques", "galactique",
+    "trantorien", "trantoriens", "trantorienne",
+    # ── Entités non-personnages Fondation ─────────────────────────────────────
+    "encyclopaedia galactica", "encyclopaedia", "galactica",
+    "plan seldon", "plan", "empire galactique", "empire",
+    "premiere fondation", "seconde fondation", "fondation",
+    # ── Verbes / syntagmes mal classifiés ─────────────────────────────────────
+    "exact", "souligner", "précéda", "le précéda",
+    "cette croyance", "affirmer", "sembler",
+    "etant", "étant", "voila", "voilà",
+    "mis",           # participe passé de "mettre" — pas Ebling Mis
+    "des principes", "votre rythme",
+    # ── Titres génériques (pas des personnages spécifiques) ──────────────────
+    "monsieur", "madame", "mademoiselle",
+    "frere", "frère",   # titre générique dans PAF Mycogen
+    "professeur",
+    # ── Objets / concepts mal classifiés ─────────────────────────────────────
+    "livre",            # objet, pas un personnage
+    "robot",            # catégorie, pas un nom propre
+    # ── Artefacts OCR ────────────────────────────────────────────────────────
+    "― sire ‖", "sire ‖",
+    "t- e-r-r-a", "terra",  # artefact OCR de TERRA (lieu)
+    # ── Dynasties / organisations ─────────────────────────────────────────────
+    "dynastie entun",
+})
+
+
+def _is_blacklisted(name: str) -> bool:
+    """
+    Retourne True si le nom doit être exclu des personnages.
+    1. Contient un saut de ligne  → artefact OCR garanti.
+    2. Longueur > 50 caractères   → artefact probable.
+    3. Dans PERSON_BLACKLIST       → entité non-personne connue.
+    4. Uniquement non-alphabétique → ponctuation/chiffres.
+    """
+    if "\n" in name:
+        return True
+    if len(name) > 50:
+        return True
+    if not any(c.isalpha() for c in name):
+        return True
+    return name.lower().strip() in PERSON_BLACKLIST
+
+
+def filter_word_count(word_count: dict[str, int]) -> dict[str, int]:
+    """Supprime les entrées non-personnes du word_count."""
+    filtered = {n: c for n, c in word_count.items() if not _is_blacklisted(n)}
+    removed = set(word_count) - set(filtered)
+    if removed:
+        Logger.info(f"Blacklist: {len(removed)} entrées supprimées → {sorted(removed)}")
+    return filtered
+
+
+def clean_ocr_text(text: str) -> str:
+    """
+    Répare les noms fragmentés par des sauts de ligne OCR avant d'envoyer à spaCy.
+    Exemples :
+      "Robot Daneel\\nOlivaw"  → "Robot Daneel Olivaw"
+      "Eto\\nDemerzel"         → "Eto Demerzel"
+
+    Stratégie : remplacer les \\n qui sont entre deux tokens qui commencent
+    par une majuscule (caractéristique d'un nom propre fragmenté) par un espace.
+    Les vrais sauts de paragraphe (\\n\\n) sont préservés.
+    """
+    # Préserver les doubles sauts de ligne (fins de paragraphe)
+    text = re.sub(r'\n\n+', '\x00', text)
+    # Réparer les noms propres fragmentés : lettre majuscule, \n, lettre majuscule
+    text = re.sub(r'([A-ZÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ][a-zàâäéèêëïîôöùûüç]*)\n([A-ZÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ])',
+                  r'\1 \2', text)
+    # Restaurer les vrais sauts de paragraphe
+    text = text.replace('\x00', '\n\n')
+    return text
+
+
+def extract_persons_spacy(text: str) -> dict[str, int]:
+    """
+    NER secondaire via spaCy sur le texte NETTOYÉ (OCR réparé).
+    Récupère les entités PER ratées par le pipeline custom.
+    Applique la blacklist avant injection.
+    """
+    nlp = get_nlp()
+    # Nettoyer les artefacts OCR avant analyse
+    text = clean_ocr_text(text)
+
+    MAX_CHUNK = 100_000
+    spacy_counts: dict[str, int] = {}
+    STRIP_CHARS = ".,;:!?\"'()[]{}«»\u201c\u201d\u2018\u2019\u2014-\u2013\u2026"
+    for start in range(0, len(text), MAX_CHUNK):
+        doc = nlp(text[start:start + MAX_CHUNK])
+        for ent in doc.ents:
+            if ent.label_ != "PER":
+                continue
+            name = ent.text.strip().strip(STRIP_CHARS).strip()
+            if not name or len(name) <= 1 or name.isdigit():
+                continue
+            if _is_blacklisted(name):
+                continue
+            spacy_counts[name] = spacy_counts.get(name, 0) + 1
+    Logger.info(f"spaCy NER: {len(spacy_counts)} entités PER après filtre")
+    return spacy_counts
+
+
+def merge_word_counts(primary: dict[str, int],
+                      secondary: dict[str, int],
+                      min_spacy_count: int = 2) -> dict[str, int]:
+    """
+    Fusionne deux word_counts.
+    Les entités nouvelles de secondary ne sont ajoutées que si count >= min_spacy_count.
+    """
+    merged = dict(primary)
+    for name, count in secondary.items():
+        if name in merged:
+            merged[name] += count
+        elif count >= min_spacy_count:
+            merged[name] = count
+    return dict(sorted(merged.items(), key=lambda x: x[1], reverse=True))
+
+
 def build_characters_graph(input_file: str,
                             save_intermediate: bool = False,
-                            save_graph_image : bool = False,
-                            show_vertices_labels : bool = False,
-                            save_unknow_verb : str|None = None,
-                            save_graphml : bool = False
-                           ) -> str:
+                            save_graph_image: bool = False,
+                            show_vertices_labels: bool = False,
+                            save_unknow_verb: str | None = None,
+                            save_graphml: bool = False
+                            ) -> str:
     book_code, chapter_number = get_book_chapter(input_file)
 
     sentences_by_pages = load_text(input_file)
@@ -388,34 +520,52 @@ def build_characters_graph(input_file: str,
     token_counts = learn_proper_token_stats(prepared)
     promoted_data = compute_promotion_demotion(*token_counts)
     result = tag_sentence_tokens(prepared, *promoted_data, save_unknow_verb)
-    
+
     result = identify_subject_for_pronoun(result)
-    
     result = merge_determiners_nouns(result)
-    
+
+    # NER primaire : pipeline custom (word_type.py)
     word_count = count_occurrences(result)
-    
-    aliases = resolve_aliases(list(word_count.keys()))
+    Logger.info(f"NER custom: {len(word_count)} personnages")
+
+    # Filtre blacklist
+    word_count = filter_word_count(word_count)
+
+    # NER secondaire : spaCy sur texte OCR nettoyé
+    with open(input_file, "r", encoding="utf-8") as f:
+        raw_text = f.read()
+    spacy_wc = extract_persons_spacy(raw_text)
+
+    # Fusion (entités spaCy nouvelles uniquement si vues >= 2 fois)
+    word_count = merge_word_counts(word_count, spacy_wc, min_spacy_count=2)
+    Logger.info(f"NER fusionné: {len(word_count)} personnages")
+
+    # Résolution d'alias unifiée
+    aliases = resolve_aliases(list(word_count.keys()), word_count=word_count)
+    canonical_names = [group[0] for group in aliases]
+
     link_table = build_links_file(
         input_file,
-        list(word_count.keys()),
-        aggregated=True,   
-        window=75,
-        min_count=1
+        canonical_names,
+        aggregated=True,
+        window=50,   # augmenté de 25 → 50 pour améliorer le rappel des arêtes
+        min_count=1,
+        external_alias_map={name: name for name in canonical_names},
     )
-    
+
     output_dir = get_output_dir(book_code, chapter_number)
-    
+
     if save_intermediate:
         save_structure_data(aliases, output_dir, "aliases")
         save_structure_data(link_table, output_dir, "link_table")
         save_structure_data(result, output_dir, "parsed_sentences")
         save_structure_data(word_count, output_dir, "word_count")
-    
+
     graph = create_graph(aliases, link_table)
-    
+
     if save_graph_image:
-        save_img_graph(graph, os.path.join(output_dir, "graph.png"), show_vertices_labels=show_vertices_labels)
+        save_img_graph(graph, os.path.join(output_dir, "graph.png"),
+                       show_vertices_labels=show_vertices_labels)
     if save_graphml:
         save_graphml_file(os.path.join(output_dir, "graphml.xml"), to_graphml(graph))
 
