@@ -8,6 +8,16 @@ DIRPATH = os.path.dirname(os.path.abspath(__file__))
 
 Logger.set_module("utils")
 
+
+
+class CustomJsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, "to_dict"):
+            return obj.to_dict()
+        return super().default(obj)
+
+
+
 class Cache:
     """
     Decorator that cache the results of a function based on its arguments.
@@ -39,7 +49,7 @@ def get_output_dir(code : str, chapter : int) -> str:
 def save_structure_data(data : list|dict, output_dir : str, type : str):
     output_file = f"{output_dir}{type}.json"
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+        json.dump(data, f, ensure_ascii=False, indent=4, cls=CustomJsonEncoder)
     Logger.info(f"Saved {type} data to {output_file}")
     
 
