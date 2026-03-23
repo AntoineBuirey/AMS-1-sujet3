@@ -384,10 +384,12 @@ PERSON_BLACKLIST: frozenset[str] = frozenset({
     "terriens", "terrien", "terrienne",
     "galactiques", "galactique",
     "trantorien", "trantoriens", "trantorienne",
+    "Mycogéniens", "mycogénien", "mycogénienne", "mycogéniennes",
     # ── Entités non-personnages Fondation ─────────────────────────────────────
     "encyclopaedia galactica", "encyclopaedia", "galactica",
     "plan seldon", "plan", "empire galactique", "empire",
     "premiere fondation", "seconde fondation", "fondation",
+    "Goutte-de-Pluie Quarante", "goutte-de-pluie quarante", "goutte de pluie quarante", "goutte-de-pluie", "goutte de pluie",
     # ── Verbes / syntagmes mal classifiés ─────────────────────────────────────
     "exact", "souligner", "précéda", "le précéda",
     "cette croyance", "affirmer", "sembler",
@@ -403,9 +405,53 @@ PERSON_BLACKLIST: frozenset[str] = frozenset({
     "robot",            # catégorie, pas un nom propre
     # ── Artefacts OCR ────────────────────────────────────────────────────────
     "― sire ‖", "sire ‖",
+    # ── Lieux non-FR et organisations détectés par spaCy ─────────────────────
+    "new york", "new york city", "chicago", "washington",
+    "police", "la police", "garde",
     "t- e-r-r-a", "terra",  # artefact OCR de TERRA (lieu)
     # ── Dynasties / organisations ─────────────────────────────────────────────
     "dynastie entun",
+    # ── Verbes à l'impératif mal classifiés (fréquent dans LCA) ──────────────
+"ecoute", "ecoutez", "ecoutez-", "reponds", "commandez",
+"etait-", "tais-toi",
+# ── Lieux US détectés par spaCy ──────────────────────────────────────────
+"new jersey",
+# ── Organisations / mouvements ───────────────────────────────────────────
+"medievalistes", "médiévalistes", "subdivisions ia",
+# ── Syntagmes mal classifiés ─────────────────────────────────────────────
+"ciel", "votre desir", "votre désir", "affaire sarton", "cette affaire", "cette affaire sarton",
+ # ── Lieux PAF (secteurs/planètes) ────────────────────────────────────────
+"helicon", "hélicon",       # planète natale de Seldon
+"billibotton",              # quartier de Dahl
+"dahl",                     # secteur de Trantor
+"streeling",                # secteur de Trantor
+"sacratorium",              # lieu Mycogène
+"microferme",               # lieu/objet
+
+# ── Ethnonymes PAF ────────────────────────────────────────────────────────
+"mycogeniens", "mycogéniens",
+"kanite",
+
+# ── Titres génériques seuls (sans nom propre) ─────────────────────────────
+"sergent", "maire",
+"maitresse", "maîtresse",   # seul, sans nom
+"soeur", "sœur", "soeurs", "sœurs",
+
+# ── Verbes mal classifiés ────────────────────────────────────────────────
+"neutralisez", "concevoir",
+
+# ── Syntagmes nominaux ───────────────────────────────────────────────────
+"sa culture et", "les predictions et", "les prédictions et",
+"toute apparence", "de maison", "la tradition", "le rite",
+"tite dame",
+
+# ── Artefacts OCR ────────────────────────────────────────────────────────
+"maitre-", "maître-", "f- frere", "f- frère",
+"bande-", "ba-lee", "da- nee", "e.g",
+"seldon acquiesça", "sauvetage",
+
+# ── Autres faux positifs ─────────────────────────────────────────────────
+"historienne", "renégat", "renegat",
 })
 
 
@@ -542,7 +588,7 @@ def build_characters_graph(input_file: str,
         input_file,
         canonical_names,
         aggregated=True,
-        window=50,   # augmenté de 25 → 50 pour améliorer le rappel des arêtes
+        window=25,   # augmenté de 25 → 50 pour améliorer le rappel des arêtes
         min_count=1,
         external_alias_map={name: name for name in canonical_names},
     )

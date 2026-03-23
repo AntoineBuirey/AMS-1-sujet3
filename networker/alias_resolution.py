@@ -34,6 +34,8 @@ def normalize_name(name: str) -> str:
     if not name:
         return ""
     name = name.lower().replace("_", " ")
+    # Normalise les points collés : "R.Daneel" → "r daneel" = "R. Daneel" → "r daneel"
+    name = re.sub(r"\.([a-zA-ZÀ-ÿ])", r" \1", name)
     name = re.sub(r"[^\w\s]", "", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name
