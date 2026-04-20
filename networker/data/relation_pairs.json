@@ -1,0 +1,297 @@
+[
+  {
+    "a": "ahab",
+    "b": "jehoram",
+    "polarity": -1
+  },
+  {
+    "a": "ahab",
+    "b": "jezabel",
+    "polarity": -1
+  },
+  {
+    "a": "alem",
+    "b": "marbie",
+    "polarity": 1
+  },
+  {
+    "a": "alem",
+    "b": "seldon",
+    "polarity": 0
+  },
+  {
+    "a": "amaryl",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "bentley",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "clousarr",
+    "polarity": -1
+  },
+  {
+    "a": "baley",
+    "b": "daneel",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "dr sarton",
+    "polarity": 0
+  },
+  {
+    "a": "baley",
+    "b": "enderby",
+    "polarity": 0
+  },
+  {
+    "a": "baley",
+    "b": "fastolfe",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "jessie",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "norris",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "olivaw",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "r. daneel",
+    "polarity": 1
+  },
+  {
+    "a": "baley",
+    "b": "r. sammy",
+    "polarity": 0
+  },
+  {
+    "a": "baley",
+    "b": "sarton",
+    "polarity": 0
+  },
+  {
+    "a": "benastra",
+    "b": "leggen",
+    "polarity": -1
+  },
+  {
+    "a": "cleon",
+    "b": "demerzel",
+    "polarity": 1
+  },
+  {
+    "a": "clousarr",
+    "b": "dr sarton",
+    "polarity": -1
+  },
+  {
+    "a": "daneel",
+    "b": "jessie",
+    "polarity": 0
+  },
+  {
+    "a": "davan",
+    "b": "seldon",
+    "polarity": -1
+  },
+  {
+    "a": "demerzel",
+    "b": "hummin",
+    "polarity": 1
+  },
+  {
+    "a": "dors",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "dr sarton",
+    "b": "enderby",
+    "polarity": 0
+  },
+  {
+    "a": "dr sarton",
+    "b": "fastolfe",
+    "polarity": 0
+  },
+  {
+    "a": "dr sarton",
+    "b": "r. daneel",
+    "polarity": 1
+  },
+  {
+    "a": "dr sarton",
+    "b": "r. sammy",
+    "polarity": 0
+  },
+  {
+    "a": "elie",
+    "b": "jezabel",
+    "polarity": -1
+  },
+  {
+    "a": "enderby",
+    "b": "fastolfe",
+    "polarity": 1
+  },
+  {
+    "a": "enderby",
+    "b": "r. sammy",
+    "polarity": 0
+  },
+  {
+    "a": "fastolfe",
+    "b": "r. daneel",
+    "polarity": 1
+  },
+  {
+    "a": "hummin",
+    "b": "kan",
+    "polarity": -1
+  },
+  {
+    "a": "hummin",
+    "b": "l'empereur",
+    "polarity": 1
+  },
+  {
+    "a": "hummin",
+    "b": "rachelle",
+    "polarity": 1
+  },
+  {
+    "a": "hummin",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "hummin",
+    "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "jehoram",
+    "b": "jehu",
+    "polarity": -1
+  },
+  {
+    "a": "jehoram",
+    "b": "jezabel",
+    "polarity": -1
+  },
+  {
+    "a": "jehu",
+    "b": "jezabel",
+    "polarity": -1
+  },
+  {
+    "a": "jessie",
+    "b": "naboth",
+    "polarity": -1
+  },
+  {
+    "a": "jessie",
+    "b": "r. daneel",
+    "polarity": -1
+  },
+  {
+    "a": "jezabel",
+    "b": "naboth",
+    "polarity": -1
+  },
+  {
+    "a": "kan",
+    "b": "rachelle",
+    "polarity": -1
+  },
+  {
+    "a": "kan",
+    "b": "seldon",
+    "polarity": 0
+  },
+  {
+    "a": "l'empereur",
+    "b": "rachelle",
+    "polarity": 1
+  },
+  {
+    "a": "leggen",
+    "b": "seldon",
+    "polarity": -1
+  },
+  {
+    "a": "mannix",
+    "b": "raych",
+    "polarity": 1
+  },
+  {
+    "a": "mannix",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "mannix",
+    "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "mannix iv",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "marbie",
+    "b": "seldon",
+    "polarity": -1
+  },
+  {
+    "a": "mere rittah",
+    "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "rachelle",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "rachelle",
+    "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "raych",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "raych",
+    "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "seldon",
+    "b": "thalus",
+    "polarity": -1
+  },
+  {
+    "a": "seldon",
+    "b": "venabili",
+    "polarity": 1
+  }
+]
