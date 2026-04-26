@@ -45,3 +45,4 @@ include-package-data = true
 networker = "networker.main:main"
 verb = "networker.verb:main"
 gen_verb = "networker.verb_table_gen:main"
+text_cleaner = "networker.text_cleaner:main"
