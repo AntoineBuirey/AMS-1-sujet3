@@ -174,7 +174,6 @@ def extract_person_mentions(sentence_tokens: List[str]) -> Dict[str, str]:
 def spacy_label_for_token(
     sentence_tokens: List[str],
     index: int,
-    window: int = 2,
     allowed_labels: Tuple[str, ...] = ("PER", "LOC", "ORG", "MISC"),
 ) -> str:
     """Try to match a spaCy entity around a token.

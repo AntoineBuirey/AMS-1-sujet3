@@ -81,6 +81,8 @@ def create_graph(
                 G[canon1][canon2]['polarity'] = (
                     1 if new_pol_sum > 0 else (-1 if new_pol_sum < 0 else 0)
                 )
+            Logger.debug(f"Edge '{canon1}'-'{canon2}' updated: weight={G[canon1][canon2]['weight']}, "
+                         f"polarity={G[canon1][canon2].get('polarity', 'N/A')}")
         else:
             attrs = {'weight': weight}
             if polarity is not None:

@@ -42,19 +42,6 @@ PRONOUNS = [
 
 PRONOUN_PREFIXES = ["J'", "C'", "L'", "Jusqu'", "D'", "Qu'", "N'", "S'"]
 
-# ADVERBS = [
-#     "aujourd'hui", "d'abord", "difficilement", "doute",
-#     "lentement", "là-bas", "part", "peut-être",
-#     "vite", "aussi", "naturellement", "jamais",
-#     "n'", "pas", "plus", "trop", "très", "bien",
-#     "mal", "souvent", "toujours", "hier", "demain",
-#     "ici", "là", "ailleurs", "partout", "dedans", "dehors",
-#     "oui", "non", "peu", "beaucoup", "décidément", "ensemble",
-#     "doucement", "exactement", "finalement", "franchement",
-#     "heureusement", "impossible", "incroyablement", "lentement",
-#     "probablement", "rapidement", "sérieusement", "simplement",
-#     "soudain", "surtout", "vraiment"
-# ]
 ADVERBS = load_file(resource("adverb.dict.txt"))
 
 PREPOSITIONS = [
@@ -90,7 +77,8 @@ PREPOSITIONS = [
     "jusque",
     "jusqu'", # Élision de "jusque" (ex: jusqu'à)
     "selon",
-    "sauf"
+    "sauf",
+    "voilà"
 ]
 
 LOCATION_PREPOSITIONS = [
@@ -115,35 +103,14 @@ SPECIAL_NON_PERSON_TOKENS = [
     "mycogène",
     "terra",
     "galactica2",
+    "spacetown",
+    "new york city",
+    "subdivisions",
+    "principes",
+    "désir"
 ]
 
 
-# CONJUNCTIONS = [
-#     # coordinating conjunctions
-#     "et",
-#     "ou",
-#     "mais",
-#     "donc",
-#     "or",
-#     "ni",
-#     "car",
-#     # subordinating conjunctions
-#     "si",
-#     "que",
-#     "lorsque",
-#     "quand",
-#     "comme",
-#     "puisque",
-#     "bien que",
-#     "quoique",
-#     "afin que",
-#     "pour que",
-#     "avant que",
-#     "après que",
-#     "tandis que",
-#     "pendant que",
-#     "aussi longtemps que",    
-# ]
 CONJUNCTIONS = load_file(resource("conjunction.dict.txt"))
 
 # INTERJECTIONS = ["ah", "oh", "eh", "ouf", "hélas", "zut", "bravo", "chut", "hé", "hi", "ha"]
@@ -204,7 +171,7 @@ PERSON_DETERMINERS = [
 # these verbs imply that a person is the next noun
 VERBS_INTRODUCING_PERSONS = [
     "rencontrer", "aider", "trouver", "connaître",
-    "voir", "apercevoir", "croiser", "saluer", "appeler", "nommer",
+    "voir", "croiser", "saluer", "nommer",
     "présenter", "interroger", "questionner", "observer", "regarder",
     "écouter", "entendre", "parler", "dire", "répondre", "demander"
 ]
@@ -229,7 +196,7 @@ def is_verb(word : str) -> bool:
     """
     Check if a word is a verb using the VerbTree.
     """
-    return verb_tree.search(word.lower().strip(string.punctuation))
+    return verb_tree.search(word.lower().strip(string.punctuation), False)
 
 def is_adverbe(word : str) -> bool:
     """
@@ -454,19 +421,21 @@ def merge_tokens(tokens: list[str], start: int, end: int) -> str:
 
 
 
-def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], index : int, word_type : TokenType) -> tuple[NounType, str]:
+def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], index : int, word_type : TokenType, maybe_incomplete_sentence : bool) -> tuple[NounType, str]:
     """
     return the guessed noun type (place, person, unknown) and the reason
     """
     word = sentence[index]
     normalized = trim_punctuation(word.lower())
+    Logger.debug(f"Guessing noun type for '{word}' (normalized: '{normalized}') at index {index} with word type {word_type}")
     if normalized in SPECIAL_NON_PERSON_TOKENS:
         return NounType.UNKNOWN, "special non-person token"
     if word_type == TokenType.PROPER_NOUN:
-        # if the word is at the beginning of the sentence, it's most likely a person
-        # except if the next word is a "=", which indicates we are in a footer.
-        # thus, we consider it as unknown
-        if index == 0:
+        if index == 0 and not maybe_incomplete_sentence:
+            # if this is the first and only word of he sentence excluding punctuation, we cannot be sure it's a person, it can be a place or something else (ex: "Hey !")
+            if len(sentence) == 1 or all(is_punct for i, is_punct in enumerate(sentence) if i != index):
+                return NounType.UNKNOWN, "only word of the sentence (excluding punctuation)"
+
             if index + 1 < len(sentence):
                 next_word = sentence[index+1].lower()
                 if next_word == "=":
@@ -474,25 +443,26 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
             return NounType.PERSON, "first word of the sentence"
         
         #check if the previous word is a determiner of place or person
-        previous_word = sentence[index-1].lower()
-        previous_word_data = sentence_data[-1]
-        if previous_word in PLACE_DETERMINERS:
-            return NounType.PLACE, "place determiner before"
-        if previous_word in PERSON_DETERMINERS:
-            return NounType.PERSON, "person determiner before"
-        if previous_word_data["type"] == TokenType.DETERMINER:
-            #in that case check the word before
-            # ex: le Dr. Smith -> Smith is a person
-            if index-2 >= 0:
-                previous_previous_word = sentence[index-2].lower()
-                if previous_previous_word in PLACE_DETERMINERS:
-                    return NounType.PLACE, "place determiner two words before"
-                if previous_previous_word in PERSON_DETERMINERS:
-                    return NounType.PERSON, "person determiner two words before"
-        if previous_word in LOCATION_PREPOSITIONS:
-            return NounType.PLACE, "location preposition before"
-        if previous_word in PERSON_PREPOSITIONS:
-            return NounType.PERSON, "person preposition before"
+        if index > 0 and sentence_data:
+            previous_word = sentence[index-1].lower()
+            previous_word_data = sentence_data[-1]
+            if previous_word in PLACE_DETERMINERS:
+                return NounType.PLACE, "place determiner before"
+            if previous_word in PERSON_DETERMINERS:
+                return NounType.PERSON, "person determiner before"
+            if previous_word_data["type"] == TokenType.DETERMINER.value:
+                #in that case check the word before
+                # ex: le Dr. Smith -> Smith is a person
+                if index-2 >= 0:
+                    previous_previous_word = sentence[index-2].lower()
+                    if previous_previous_word in PLACE_DETERMINERS:
+                        return NounType.PLACE, "place determiner two words before"
+                    if previous_previous_word in PERSON_DETERMINERS:
+                        return NounType.PERSON, "person determiner two words before"
+            if previous_word in LOCATION_PREPOSITIONS:
+                return NounType.PLACE, "location preposition before"
+            if previous_word in PERSON_PREPOSITIONS:
+                return NounType.PERSON, "person preposition before"
         
         # if the next word is a verb at 3rd person, it's most likely a person
         # if index + 1 < len(sentence):
