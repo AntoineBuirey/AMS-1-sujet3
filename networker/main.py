@@ -253,7 +253,7 @@ def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]],
                     word = words_list_dict[-1]["word"]
                     word = word.strip("-")
                     try:
-                        verb_data = get_verb_data(words_list_dict[-1]["word"], words_list_dict, j)
+                        verb_data = get_verb_data(word, words_list_dict, j)
                     except ValueError as e:
                         # don't merge if the verb not found, mark the second element as ADJECTIVE instead
                         words_list_dict[-1]["word"] = words_list_dict[-1]["word"].rsplit(" ", 1)[0]

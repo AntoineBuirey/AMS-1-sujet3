@@ -48,6 +48,7 @@ def append_to_file(output_path: str, word: str):
     Append content to a file
     Do nothing if word is already in the file
     """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     if os.path.exists(output_path):
         with open(output_path, "r", encoding="utf-8") as f:
             existing_words = set(line.strip() for line in f)
