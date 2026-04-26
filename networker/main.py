@@ -41,6 +41,15 @@ Logger.set_module("main")
 
 
 # ===== Constants =====
+# Mapping from TokenType to the corresponding DataObject class, used for concatenation checks
+_TOKEN_TYPE_TO_DO_CLASS: dict[TokenType, type] = {
+    TokenType.PROPER_NOUN: DO.ProperNoun,
+    TokenType.COMMON_NOUN: DO.CommonNoun,
+    TokenType.VERB: DO.Verb,
+    TokenType.ADVERB: DO.Adverb,
+    TokenType.DETERMINER: DO.Determiner,
+}
+
 # Thresholds for promotion/demotion of proper-noun candidates
 PROMOTE_MIN_COUNT = 2       # min proper observations to consider a token
 PROMOTE_MIN_SCORE = 0.7    # proper / (proper + nonproper_lower)
@@ -253,9 +262,9 @@ def tag_sentence_tokens(
             token_type = classify_token_with_context(item, j, promoted_tokens, promoted_bigrams, auto_demote_tokens)
             if token_type in MUST_BE_CONCATENATED \
             and words_list_dict \
-            and words_list_dict[-1].__class__.__name__ == token_type.value \
+            and isinstance(words_list_dict[-1], _TOKEN_TYPE_TO_DO_CLASS[token_type]) \
             and (token_type != TokenType.VERB or get_verb_data(tok, [w.word for w in words_list_dict], j).mood != Mood.INFINITIF): # do not merge if the second part is an infinitive
-                words_list_dict[-1]["word"] += " " + tok # type: ignore
+                words_list_dict[-1].word += " " + tok
                 
                 if token_type == TokenType.VERB:
                     # since it's a concatenated verb, we need to update the verb data with the new one
