@@ -484,8 +484,11 @@ def extract_persons_spacy(text: str) -> dict[str, DO.WordOccurence]:
                 continue
             if _is_blacklisted(name):
                 continue
-            # spacy_counts[name] = spacy_counts.get(name, 0) + 1
-            spacy_counts[name] = spacy_counts.get(name, DO.WordOccurence(0, []))
+            occurrence = spacy_counts.get(name)
+            if occurrence is None:
+                occurrence = DO.WordOccurence(0, [])
+                spacy_counts[name] = occurrence
+            occurrence.quantity += 1
     Logger.info(f"spaCy NER: {len(spacy_counts)} entités PER après filtre")
     return spacy_counts
 
