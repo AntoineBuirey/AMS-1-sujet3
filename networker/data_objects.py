@@ -7,14 +7,19 @@ class DataObject:
     
     class Unknown: ...
 
-    @dataclass
+    @dataclass(eq=False)
     class Word:
         word: str
         position: int
-        
+
+        def __eq__(self, other):
+            if not isinstance(other, DataObject.Word):
+                return NotImplemented
+            return self.word == other.word
+
         def __hash__(self):
-            return hash((self.word, self.position))
-        
+            return hash(self.word)
+
         def to_dict(self):
             return {
                 "word": self.word,
