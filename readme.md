@@ -5,6 +5,7 @@
 To install the package in editable mode, run the following command in your terminal:
 ```bash
 pip install -e .
+pip install https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl
 ```
 
 ## Usage

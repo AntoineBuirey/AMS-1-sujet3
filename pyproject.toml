@@ -28,8 +28,7 @@ dependencies = [
 "six==1.17.0",
 "spacy>=3.8.11",
 "tqdm==4.67.1",
-"pandas==2.2.3",
-"fr_core_news_sm==3.8.0@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl"
+"pandas==2.2.3"
 ]
 [project.optional-dependencies]
 ai = ["google-genai"]
@@ -46,3 +45,4 @@ include-package-data = true
 networker = "networker.main:main"
 verb = "networker.verb:main"
 gen_verb = "networker.verb_table_gen:main"
+text_cleaner = "networker.text_cleaner:main"
