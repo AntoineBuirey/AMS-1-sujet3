@@ -1,6 +1,5 @@
 from enum import StrEnum
 import string
-from typing import Any
 import re
 
 from gamuLogger import Logger
@@ -9,6 +8,8 @@ from .verbs_engine import VerbTree, VerbData, Pronoun, pronoun_map, Mood, Tense
 from .utils import resource, Cache
 from .standardizer import trim_punctuation
 from .spacy_helper import spacy_label_for_token
+from .data_objects import DataObject as DO
+from .token_type import TokenType, NounType
 
 Logger.set_module("word_type")
 
@@ -123,20 +124,7 @@ RE_ACRONYM = re.compile(r"^([A-Za-z]\.){2,}[A-Za-z]?$")
 
 COMMON_NOUNS = load_file(resource("noun.dict.txt"))
 
-class TokenType(StrEnum):
-    PROPER_NOUN = "proper_noun"
-    COMMON_NOUN = "common_noun"
-    ADJECTIVE = "adjective"
-    VERB = "verb"
-    ADVERB = "adverb"
-    DETERMINER = "determiner"
-    PRONOUN = "pronoun"
-    PREPOSITION = "preposition"
-    CONJUNCTION = "conjunction"
-    PUNCTUATION = "punctuation"
-    INTERJECTION = "interjection"
-    ACRONYM = "acronym"
-    UNKNOWN = "unknown"
+
     
 
 MUST_BE_CONCATENATED = { # if multiple tokens of the same type and the type is in this set, they must be concatenated in one token
@@ -176,11 +164,6 @@ VERBS_INTRODUCING_PERSONS = [
     "écouter", "entendre", "parler", "dire", "répondre", "demander"
 ]
 
-
-class NounType(StrEnum):
-    PLACE = "place"
-    PERSON = "person"
-    UNKNOWN = "unknown"
 
 def is_acronym(word: str) -> bool:
     return bool(RE_ACRONYM.match(word))
@@ -262,42 +245,41 @@ def get_adj_list() -> set[str]:
                 adjectives.add(adj.lower())
     return adjectives
 
-def guess_type_of_token(sentence : list[str], index : int) -> TokenType:
+def guess_type_of_token(token : str, first_word_of_sentence : bool) -> TokenType:
     """Guess the type of a token (proper noun, common noun, verb, adverb, determinant, pronoun, unknown)."""
-    word = sentence[index]
-    if not word:
+    if not token:
         return TokenType.UNKNOWN
-    if is_hardcoded_proper_noun(word):
+    if is_hardcoded_proper_noun(token):
         return TokenType.PROPER_NOUN
-    if word.lower() in COMMON_NOUNS:
+    if token.lower() in COMMON_NOUNS:
         return TokenType.COMMON_NOUN
-    if is_acronym(word):
+    if is_acronym(token):
         return TokenType.ACRONYM
-    if is_determinant(word):
+    if is_determinant(token):
         return TokenType.DETERMINER
-    if is_pronoun(word):
+    if is_pronoun(token):
         return TokenType.PRONOUN
-    if is_adverbe(word):
+    if is_adverbe(token):
         return TokenType.ADVERB
-    if is_verb(word):
+    if is_verb(token):
         return TokenType.VERB
-    if is_preposition(word):
+    if is_preposition(token):
         return TokenType.PREPOSITION
-    if is_conjunction(word):
+    if is_conjunction(token):
         return TokenType.CONJUNCTION
-    if is_punctuation(word):
+    if is_punctuation(token):
         return TokenType.PUNCTUATION
-    if is_interjection(word):
+    if is_interjection(token):
         return TokenType.INTERJECTION
-    if is_adjective(word):
+    if is_adjective(token):
         return TokenType.ADJECTIVE
-    if word[0].isupper():
-        if len(word) == 1:
-            return TokenType.UNKNOWN
-        if index == 0:
-            normalized_word = trim_punctuation(word)
+    if token[0].isupper():
+        # if len(token) == 1:
+        #     return TokenType.UNKNOWN
+        if first_word_of_sentence:
+            normalized_word = trim_punctuation(token)
             # First word of the sentence
-            if any(char in word for char in string.ascii_letters):  # contains at least one letter
+            if any(char in token for char in string.ascii_letters):  # contains at least one letter
                 if (normalized_word not in get_fonctional_words()):
                     return TokenType.PROPER_NOUN
         else:
@@ -314,12 +296,17 @@ def _neighbor_normalized(tokens: list[str], index: int, offset: int) -> str:
 
 
 def classify_token_with_context(
-    sentence_tokens: list[str],
-    index: int,
-    all_caps: bool,
-    promoted_tokens: set | None = None,
-    promoted_bigrams: set | None = None,
-    auto_demote_tokens: set | None = None,
+    # sentence_tokens: list[str],
+    # index: int,
+    # all_caps: bool,
+    # promoted_tokens: set | None = None,
+    # promoted_bigrams: set | None = None,
+    # auto_demote_tokens: set | None = None,
+    sentence : DO.Sentence,
+    token_index: int,
+    promoted_tokens: set[str] | None = None,
+    promoted_bigrams: set[tuple[str, str]] | None = None,
+    auto_demote_tokens: set[str] | None = None
 ) -> TokenType:
     """
     Context-aware token classifier.
@@ -342,18 +329,18 @@ def classify_token_with_context(
         - tokens part of promoted_bigrams (prev/current or current/next) => PROPER_NOUN
         - otherwise => COMMON_NOUN
     """
-    word = sentence_tokens[index]
+    token = sentence.tokens[token_index]
 
     # Non ALL-CAPS: use the existing surface-level guesser
-    if not all_caps:
-        return guess_type_of_token(sentence_tokens, index)
+    if not sentence.all_caps:
+        return guess_type_of_token(token, token_index == 0)
 
     # Use empty sets if none provided (no globals needed)
     promoted_tokens = promoted_tokens or set()
     promoted_bigrams = promoted_bigrams or set()
     auto_demote_tokens = auto_demote_tokens or set()
 
-    normalized_word = trim_punctuation(word)
+    normalized_word = trim_punctuation(token)
 
     if normalized_word in auto_demote_tokens:
         return TokenType.COMMON_NOUN
@@ -361,8 +348,8 @@ def classify_token_with_context(
     if normalized_word in promoted_tokens:
         return TokenType.PROPER_NOUN
 
-    prev = _neighbor_normalized(sentence_tokens, index, -1)
-    nxt = _neighbor_normalized(sentence_tokens, index, 1)
+    prev = _neighbor_normalized(sentence.tokens, token_index, -1)
+    nxt = _neighbor_normalized(sentence.tokens, token_index, 1)
     if (normalized_word, nxt) in promoted_bigrams or (prev, normalized_word) in promoted_bigrams:
         return TokenType.PROPER_NOUN
 
@@ -381,7 +368,7 @@ PRONOUN_MAP = {
     "elles": Pronoun.ILS_ELLES
 }
 
-def get_verb_data(verb: str, words_list_dict, position : int) -> VerbData:
+def get_verb_data(verb: str, words: list[str], position : int) -> VerbData:
     """Return all possible conjugations and info for a verb as a list of VerbData."""
     verb = verb.lower().strip(string.punctuation)
     candidates = verb_tree.get(verb, strict=False)
@@ -402,7 +389,7 @@ def get_verb_data(verb: str, words_list_dict, position : int) -> VerbData:
         # If multiple candidates, try to disambiguate using context
         # (simple heuristic: check previous word for pronoun)
         if position > 0:
-            prev_word = words_list_dict[-1]["word"].lower()
+            prev_word = words[-1].lower()
             if prev_word in PRONOUN_MAP:
                 pronoun = PRONOUN_MAP[prev_word]
                 filtered = [vd for vd in candidates if vd.pronoun == pronoun]
@@ -421,11 +408,11 @@ def merge_tokens(tokens: list[str], start: int, end: int) -> str:
 
 
 
-def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], index : int, word_type : TokenType, maybe_incomplete_sentence : bool) -> tuple[NounType, str]:
+def guess_noun_type(words : list[str], index : int, word_type : TokenType, maybe_incomplete_sentence : bool) -> tuple[NounType, str]:
     """
     return the guessed noun type (place, person, unknown) and the reason
     """
-    word = sentence[index]
+    word = words[index]
     normalized = trim_punctuation(word.lower())
     Logger.debug(f"Guessing noun type for '{word}' (normalized: '{normalized}') at index {index} with word type {word_type}")
     if normalized in SPECIAL_NON_PERSON_TOKENS:
@@ -433,54 +420,43 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
     if word_type == TokenType.PROPER_NOUN:
         if index == 0 and not maybe_incomplete_sentence:
             # if this is the first and only word of he sentence excluding punctuation, we cannot be sure it's a person, it can be a place or something else (ex: "Hey !")
-            if len(sentence) == 1 or all(is_punct for i, is_punct in enumerate(sentence) if i != index):
+            if len(words) == 1 or all(is_punct for i, is_punct in enumerate(words) if i != index):
                 return NounType.UNKNOWN, "only word of the sentence (excluding punctuation)"
 
-            if index + 1 < len(sentence):
-                next_word = sentence[index+1].lower()
+            if index + 1 < len(words):
+                next_word = words[index+1].lower()
                 if next_word == "=":
                     return NounType.UNKNOWN, "footer detected"
             return NounType.PERSON, "first word of the sentence"
         
         #check if the previous word is a determiner of place or person
-        if index > 0 and sentence_data:
-            previous_word = sentence[index-1].lower()
-            previous_word_data = sentence_data[-1]
-            if previous_word in PLACE_DETERMINERS:
+        if index > 0:
+            previous_word = words[index-1]
+            if previous_word.lower() in PLACE_DETERMINERS:
                 return NounType.PLACE, "place determiner before"
-            if previous_word in PERSON_DETERMINERS:
+            if previous_word.lower() in PERSON_DETERMINERS:
                 return NounType.PERSON, "person determiner before"
-            if previous_word_data["type"] == TokenType.DETERMINER.value:
+            if isinstance(previous_word, DO.Determiner):
                 #in that case check the word before
                 # ex: le Dr. Smith -> Smith is a person
                 if index-2 >= 0:
-                    previous_previous_word = sentence[index-2].lower()
+                    previous_previous_word = words[index-2].lower()
                     if previous_previous_word in PLACE_DETERMINERS:
                         return NounType.PLACE, "place determiner two words before"
                     if previous_previous_word in PERSON_DETERMINERS:
                         return NounType.PERSON, "person determiner two words before"
-            if previous_word in LOCATION_PREPOSITIONS:
+            if previous_word.lower() in LOCATION_PREPOSITIONS:
                 return NounType.PLACE, "location preposition before"
-            if previous_word in PERSON_PREPOSITIONS:
+            if previous_word.lower() in PERSON_PREPOSITIONS:
                 return NounType.PERSON, "person preposition before"
-        
-        # if the next word is a verb at 3rd person, it's most likely a person
-        # if index + 1 < len(sentence):
-        #     next_word = sentence[index+1].lower()
-        #     next_word_data = guess_type_of_token(sentence, index+1)
-        #     if next_word_data == TokenType.VERB:
-        #         verb_data = get_verb_data(next_word, sentence_data, index+1)
-        #         if verb_data.pronoun == Pronoun.IL_ELLE_ON:
-        #             return NounType.PERSON, "next word is 3rd person verb"
                 
         # if the previous word is a verb at 3rd person, it's most likely a person
         # but in that case, the verb should be in past tense (passé simple or imparfait)
         # in that case, they must be no subject pronoun before the verb
         if index - 1 >= 0:
-            previous_word = sentence[index-1].lower()
-            previous_word_data = guess_type_of_token(sentence, index-1)
-            if previous_word_data == TokenType.VERB:
-                verb_data = get_verb_data(previous_word, sentence_data, index-1)
+            previous_word = words[index-1]
+            if isinstance(previous_word, DO.Verb):
+                verb_data = get_verb_data(previous_word.word.lower(), words, index-1)
                 if verb_data.pronoun == Pronoun.IL_ELLE_ON and verb_data.tense in [Tense.PASSE_SIMPLE, Tense.IMPARFAIT]:
                     # return NounType.PERSON, "previous word is 3rd person past tense verb"
                     # check if there is no subject pronoun before the verb
@@ -488,22 +464,22 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
                     Logger.debug(f"Checking for subject pronoun before verb '{previous_word}' at index {index-1}")
                     # locate the verb in sentence_data (may be different from index-1 due to merged tokens)
                     verb_position_in_data = None
-                    for i, word_data in enumerate(sentence_data):
-                        if trim_punctuation(word_data["word"]).lower() == previous_word:
+                    for i, word_data in enumerate(words):
+                        if trim_punctuation(word_data).lower() == previous_word:
                             verb_position_in_data = i
                             break
                     if verb_position_in_data is not None:
                         for j in range(verb_position_in_data-1, -1, -1):
-                            word_data = sentence_data[j]
-                            if word_data["type"] == TokenType.PRONOUN:
-                                pronoun_word = word_data["word"].lower()
+                            word_data = words[j]
+                            if isinstance(word_data, DO.Pronoun):
+                                pronoun_word = word_data.word.lower()
                                 if pronoun_word in PRONOUN_MAP:
                                     pronoun = PRONOUN_MAP[pronoun_word]
                                     if pronoun == Pronoun.IL_ELLE_ON:
                                         has_subject_pronoun = True
                                         Logger.debug(f"Found subject pronoun '{pronoun_word}' before verb '{previous_word}'")
                                         break
-                            elif word_data["type"] not in [TokenType.DETERMINER, TokenType.ADVERB]:
+                            elif not (isinstance(word_data, DO.Determiner) or isinstance(word_data, DO.Adverb)):
                                 # stop searching if we hit a non-functional word
                                 break
                     if not has_subject_pronoun:
@@ -511,37 +487,37 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
                 
         # if the previous word is a verb that implies introducing a person
         if index - 1 >= 0:
-            previous_word = sentence[index-1].lower()
-            previous_word_data = guess_type_of_token(sentence, index-1)
+            previous_word = words[index-1].lower()
+            previous_word_data = guess_type_of_token(words[index-1], index-1 == 0)
             if previous_word_data == TokenType.VERB:
-                verb_data = get_verb_data(previous_word, sentence_data, index-1)
+                verb_data = get_verb_data(previous_word, words, index-1)
                 if verb_data.infinitive in VERBS_INTRODUCING_PERSONS:
                     return NounType.PERSON, "previous word is verb introducing person"
         
         # otherwise check if we encountered this token and if we know its type
-        normalized_word = trim_punctuation(sentence[index])
-        for i, word_data in enumerate(sentence_data):
-            if i != index and trim_punctuation(word_data["word"]) == normalized_word:
-                if "noun_type" in word_data:
-                    return NounType(word_data["noun_type"]), f"known noun type from previous occurrence: {word_data['noun_type']}"
+        normalized_word = trim_punctuation(words[index])
+        for i, word_data in enumerate(words):
+            if i != index and trim_punctuation(word_data) == normalized_word:
+                if isinstance(word_data, DO.Noun):
+                    return NounType(word_data.noun_type), f"known noun type from previous occurrence: {word_data.noun_type}"
                 
         # if the word is in uppercase, consider it as a person (his name is written somewhere, like on a door)
         # if it has at least one neighbor that is also a proper_noun uppercase
-        if sentence[index].isupper():
-            if (index > 0 and sentence[index-1].isupper() and guess_type_of_token(sentence, index-1) == TokenType.PROPER_NOUN) or \
-               (index + 1 < len(sentence) and sentence[index+1].isupper() and guess_type_of_token(sentence, index+1) == TokenType.PROPER_NOUN):
+        if words[index].isupper():
+            if (index > 0 and words[index-1].isupper() and guess_type_of_token(words[index-1], index-1 == 0) == TokenType.PROPER_NOUN) or \
+               (index + 1 < len(words) and words[index+1].isupper() and guess_type_of_token(words[index-1], index+1 == 0) == TokenType.PROPER_NOUN):
                 return NounType.PERSON, "all caps with proper noun neighbor"
             
         
         # if the word is between 2 commas or between a comma and the end of the sentence,
         # ex: ", John ," / ", John."
-        if (index > 0 and sentence[index-1] == ",") and \
-           (index + 1 < len(sentence) and sentence[index+1] in [",", ".", ";", "!", "?"]):
+        if (index > 0 and words[index-1] == ",") and \
+           (index + 1 < len(words) and words[index+1] in [",", ".", ";", "!", "?"]):
             return NounType.PERSON, "between commas or comma and sentence end"
 
         # --- spaCy vote (hybrid rules + NER) ---
         # Helps reduce false characters and recover missed person entities.
-        spacy_label = spacy_label_for_token(sentence, index)
+        spacy_label = spacy_label_for_token([w for w in words], index)
 
         # If spaCy strongly indicates a person, promote to PERSON.
         if spacy_label == "PER":
@@ -561,34 +537,33 @@ def guess_noun_type(sentence : list[str], sentence_data : list[dict[str, Any]], 
         # check for prepositions and verbs before the noun
         if index == 0:
             return NounType.UNKNOWN, "first word of the sentence"
-        previous_word = sentence[index-1].lower()
-        previous_word_data = sentence_data[-1]
-        if previous_word_data["type"] == TokenType.PREPOSITION:
+        previous_word = words[index-1]
+        if isinstance(previous_word, DO.Preposition):
             # in that case check if it's a location or person preposition
             # ex: à Paris -> Paris is a place
             return NounType.UNKNOWN, "preposition before common noun"
-        if previous_word_data["type"] == TokenType.DETERMINER:
+        if isinstance(previous_word, DO.Determiner):
             # in that case check words before unitl we find anything other than a determiner or an adverb
             # ex: je cherche tranquillement la maison de mon ami -> maison is a place because of "la"
             if index-2 >= 0:
-                previous_previous_word = sentence[index-2].lower()
+                previous_previous_word = words[index-2].lower()
                 if previous_previous_word in LOCATION_PREPOSITIONS:
                     return NounType.PLACE, "location preposition two words before"
                 if previous_previous_word in PERSON_PREPOSITIONS or previous_previous_word in PERSON_DETERMINERS:
                     return NounType.PERSON, "person preposition or determiner two words before"
         
         # otherwise check if we encountered this token and if we know its type
-        normalized_word = trim_punctuation(sentence[index])
-        for i, word_data in enumerate(sentence_data):
-            if i != index and trim_punctuation(word_data["word"]) == normalized_word:
-                if "noun_type" in word_data:
-                    return NounType(word_data["noun_type"]), f"known noun type from previous occurrence: {word_data['noun_type']}"
+        normalized_word = trim_punctuation(words[index])
+        for i, word_data in enumerate(words):
+            if i != index and trim_punctuation(word_data) == normalized_word:
+                if isinstance(word_data, DO.Noun):
+                    return NounType(word_data.noun_type), f"known noun type from previous occurrence: {word_data.noun_type}"
         return NounType.UNKNOWN, "no specific clues found"
     else:
         raise ValueError(f"Cannot guess noun type for word type {word_type}")
 
 
-def identify_subject_for_pronoun(data : list[dict]) -> list[dict]:
+def identify_subject_for_pronoun(data : list[DO.Sentence]) -> list[DO.Sentence]:
     """
     Try to identify the subject for pronouns in the text.
     Add a "refer-to" field to pronoun tokens if found.
@@ -597,17 +572,17 @@ def identify_subject_for_pronoun(data : list[dict]) -> list[dict]:
     Do not cross pages because we have only one page over 2, so the context is lost.
     if the subject cannot be found, leave it as unknown.
     """
-    last_subjects_by_page : dict[int, str] = {}
+    last_subjects_by_page : dict[int, DO.Noun] = {}
     for sentence_data in data:
-        page_index = sentence_data["page_index"]
-        words_list = sentence_data["words"]
+        page_index = sentence_data.page_index
+        words_list = sentence_data.words
         for word_data in words_list:
-            if word_data["type"] in [TokenType.PROPER_NOUN, TokenType.COMMON_NOUN]:
-                if word_data.get("noun_type") == NounType.PERSON:
-                    last_subjects_by_page[page_index] = word_data["word"]
-            elif word_data["type"] == TokenType.PRONOUN:
-                pronoun_word = word_data["word"].lower()
+            if isinstance(word_data, DO.Noun):
+                if word_data.noun_type == NounType.PERSON:
+                    last_subjects_by_page[page_index] = word_data
+            elif isinstance(word_data, DO.Pronoun):
+                pronoun_word = word_data.word.lower()
                 if pronoun_word in ["je", "tu", "il", "elle", "on"]:
-                    subject = last_subjects_by_page.get(page_index, "unknown")
-                    word_data["refer-to"] = subject
+                    subject = last_subjects_by_page.get(page_index, None)
+                    word_data.refer_to = subject
     return data

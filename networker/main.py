@@ -5,6 +5,9 @@ import os
 from typing import Any
 import string
 
+from .word_type import NounType
+from .data_objects import DataObject as DO
+ 
 
 # External modules
 import nltk
@@ -39,9 +42,19 @@ Logger.set_module("main")
 
 
 # ===== Constants =====
-PROMOTE_MIN_COUNT = 2
-PROMOTE_MIN_SCORE = 0.7
-PROMOTE_MIN_BIGRAM = 1
+# Mapping from TokenType to the corresponding DataObject class, used for concatenation checks
+_TOKEN_TYPE_TO_DO_CLASS: dict[TokenType, type] = {
+    TokenType.PROPER_NOUN: DO.ProperNoun,
+    TokenType.COMMON_NOUN: DO.CommonNoun,
+    TokenType.VERB: DO.Verb,
+    TokenType.ADVERB: DO.Adverb,
+    TokenType.DETERMINER: DO.Determiner,
+}
+
+# Thresholds for promotion/demotion of proper-noun candidates
+PROMOTE_MIN_COUNT = 2       # min proper observations to consider a token
+PROMOTE_MIN_SCORE = 0.7     # proper / (proper + nonproper_lower)
+PROMOTE_MIN_BIGRAM = 1      # min observations for a proper bigram
 
 DEMOTE_MIN_COUNT = 1
 DEMOTE_MAX_RATIO = 0.15
@@ -96,8 +109,10 @@ def load_text(input_file: str) -> list[list[str]]:
     Logger.info(f"Loaded {nb_sentences} sentences from {input_file}")
     return sentences_by_pages
 
-def prepare_sentences(sentences_by_pages: list[list[str]]) -> list[dict[str, int | str | bool | list[str]]]:
-    prepared = []
+
+# --------- PASS 0: sentence preparation ---------
+def prepare_sentences(sentences_by_pages: list[list[str]]) -> list[DO.Sentence]:
+    prepared : list[DO.Sentence] = []
     for page_index, page_sentences in enumerate(sentences_by_pages):
         for i in range(len(page_sentences)):
             maybe_incomplete = False
@@ -111,26 +126,30 @@ def prepare_sentences(sentences_by_pages: list[list[str]]) -> list[dict[str, int
             tokens = word_tokenize(sentence, language="french")
             tokens = split_words_with_quote_dash(tokens)
             tokens = [t for t in tokens if t.strip() != ""]
-            prepared.append({
-                "sentence_index": i,
-                "original_sentence": original_sentence,
-                "full_sentence": sentence,
-                "maybe_incomplete": maybe_incomplete,
-                "page_index": page_index,
-                "tokens": tokens,
-                "all_caps": is_all_caps_sentence(tokens)
-            })
+            prepared.append(DO.Sentence(
+                index=i,
+                original_sentence=original_sentence,
+                full_sentence=sentence,
+                maybe_incomplete=maybe_incomplete,
+                page_index=page_index,
+                tokens=tokens,
+                words=[],  # to be filled in the next pass
+                all_caps=is_all_caps_sentence(tokens)
+            ))
     return prepared
 
-def learn_proper_token_stats(prepared: list[dict]) -> tuple[defaultdict, defaultdict, defaultdict]:
-    proper_token_count = defaultdict(int)
-    nonproper_lower_count = defaultdict(int)
-    proper_bigram_count = defaultdict(int)
+# --------- PASS A: learn proper nouns from non-ALL-CAPS sentences ---------
+def learn_proper_token_stats(prepared: list[DO.Sentence]) -> tuple[defaultdict, defaultdict, defaultdict]:
+    proper_token_count = defaultdict(int)       # normalized token -> count of proper-noun occurrences
+    nonproper_lower_count = defaultdict(int)    # normalized token -> count of non-proper occurrences in lowercase
+    proper_bigram_count = defaultdict(int)      # (normalized token1, normalized token2) -> count of proper-noun bigram occurrences
+
     for item in prepared:
-        if item["all_caps"]:
+        if item.all_caps:
             continue
-        tokens = item["tokens"]
-        flags = [guess_type_of_token(tokens, j) == TokenType.PROPER_NOUN for j in range(len(tokens))]
+        tokens = item.tokens
+        flags = [guess_type_of_token(tokens[j], j == 0) == TokenType.PROPER_NOUN for j in range(len(tokens))]
+
         for j, tok in enumerate(tokens):
             w = trim_punctuation(tok)
             if not w:
@@ -142,7 +161,8 @@ def learn_proper_token_stats(prepared: list[dict]) -> tuple[defaultdict, default
                     nonproper_lower_count[w] += 1
         for j in range(len(tokens)-1):
             if flags[j] and flags[j+1]:
-                t1 = trim_punctuation(tokens[j]); t2 = trim_punctuation(tokens[j+1])
+                t1 = trim_punctuation(tokens[j])
+                t2 = trim_punctuation(tokens[j+1])
                 if t1 and t2:
                     proper_bigram_count[(t1, t2)] += 1
     return proper_token_count, nonproper_lower_count, proper_bigram_count
@@ -166,107 +186,117 @@ def compute_promotion_demotion(proper_token_count, nonproper_lower_count, proper
     promoted_bigrams = {bg for bg, c in proper_bigram_count.items() if c >= PROMOTE_MIN_BIGRAM}
     return promoted_tokens, promoted_bigrams, auto_demote_tokens
 
-def tag_sentence_tokens(prepared: list[dict[str, int | str | bool | list[str]]], promoted_tokens: set, promoted_bigrams: set, auto_demote_tokens: set, store_unknow_verb: str | None = None) -> list[dict]:
+
+
+# --------- PASS B: final tagging ---------
+def tag_sentence_tokens(
+        prepared: list[DO.Sentence],
+        promoted_tokens: set,
+        promoted_bigrams: set,
+        auto_demote_tokens: set[str],
+        store_unknow_verb : str|None = None
+    ) -> list[DO.Sentence]:
     result = []
     potential_persons = defaultdict(int)
     for item in prepared:
-        tokens = item["tokens"]
+        tokens = item.tokens
         if not isinstance(tokens, list) or not tokens:
             raise ValueError(f"Invalid tokens in item: {item}")
-        all_caps = item["all_caps"]
+        all_caps = item.all_caps
         if not isinstance(all_caps, bool):
             raise ValueError(f"Invalid all_caps in item: {item}")
-        words_list_dict: list[dict[str, int | str | Any]] = []
+        words_list_dict : list[DO.Word] = []
         for j, tok in enumerate(tokens):
-            token_type = classify_token_with_context(tokens, j, all_caps, promoted_tokens, promoted_bigrams, auto_demote_tokens)
+            token_type = classify_token_with_context(item, j, promoted_tokens, promoted_bigrams, auto_demote_tokens)
             if token_type in MUST_BE_CONCATENATED \
             and words_list_dict \
-            and words_list_dict[-1]["type"] == token_type.value \
-            and (token_type != TokenType.VERB or get_verb_data(tok, words_list_dict, j).mood != Mood.INFINITIF):
-                words_list_dict[-1]["word"] += " " + tok
+            and isinstance(words_list_dict[-1], _TOKEN_TYPE_TO_DO_CLASS[token_type]) \
+            and (token_type != TokenType.VERB or get_verb_data(tok, [w.word for w in words_list_dict], j).mood != Mood.INFINITIF): # do not merge if the second part is an infinitive
+                words_list_dict[-1].word += " " + tok
+                
                 if token_type == TokenType.VERB:
-                    word = words_list_dict[-1]["word"].strip("-")
+                    # since it's a concatenated verb, we need to update the verb data with the new one
+                    word = words_list_dict[-1].word.strip("-")
                     try:
-                        verb_data = get_verb_data(word, words_list_dict, j)
+                        verb_data = get_verb_data(word, [w.word for w in words_list_dict], j)
                     except ValueError as e:
-                        words_list_dict[-1]["word"] = words_list_dict[-1]["word"].rsplit(" ", 1)[0]
-                        words_list_dict.append({"word": tok, "position": j, "type": TokenType.ADJECTIVE.value})
+                        # don't merge if the verb not found, mark the second element as ADJECTIVE instead
+                        words_list_dict[-1].word = words_list_dict[-1].word.rsplit(" ", 1)[0]
+                        words_list_dict.append(DO.Adjective(tok, j))
                         prev_token = words_list_dict[-2]
-                        Logger.debug(f"{e}\ndefaulting to:\n\t{prev_token['word']:10} {prev_token['type']}\n\t{tok:10} adjective")
+                        Logger.debug(f"{e}\ndefaulting to:\n\t{prev_token.word:10} {prev_token.__class__.__name__}\n\t{tok:10} adjective")
                         if store_unknow_verb:
-                            append_to_file(store_unknow_verb, words_list_dict[-1]['word'])
+                            append_to_file(store_unknow_verb, words_list_dict[-1].word)
+                            Logger.debug(f"Stored unknown verb '{words_list_dict[-1].word}' to {store_unknow_verb}")
                         continue
-                    words_list_dict[-1]['verb_data'] = {
-                        "infinitive": verb_data.infinitive,
-                        "mood": mood_map_inv[verb_data.mood],
-                        "tense": tense_map_inv[verb_data.tense],
-                        "pronoun": pronoun_map_inv[verb_data.pronoun]
-                    }
+                    verb = DO.Verb(words_list_dict[-1].word, j)
+                    verb.infinitive = verb_data.infinitive
+                    verb.mood = verb_data.mood
+                    verb.tense = verb_data.tense
+                    verb.pronoun = verb_data.pronoun
+                    words_list_dict[-1] = verb
+                
             else:
-                token_data: dict[str, int | str | Any] = {"word": tok, "position": j, "type": token_type.value}
-                if token_type in {TokenType.PROPER_NOUN, TokenType.COMMON_NOUN}:
-                    maybe_incomplete_sentence : bool = item["maybe_incomplete"] #type: ignore
+                if token_type == TokenType.UNKNOWN:
+                    Logger.warning(f"Token '{tok}' in sentence '{item.full_sentence}' (index {j}) classified as UNKNOWN")
+                word = DO.build_Word(tok, j, token_type)
+                if isinstance(word, DO.Noun):
                     try:
-                        noun_type, reason = guess_noun_type(tokens, words_list_dict, j, token_type, maybe_incomplete_sentence)
+                        noun_type, reason = guess_noun_type(tokens, j, token_type, item.maybe_incomplete)
                     except Exception as e:
-                        Logger.error(f"Error guessing noun type for token '{tok}' in sentence '{item['full_sentence']}' (index {j}): {e}")
+                        Logger.error(f"Error guessing noun type for token '{tok}' in sentence '{item.full_sentence}' (index {j}): {e}")
                         Logger.error(words_list_dict)
                         raise
-                    token_data["noun_type"] = noun_type.value
-                    token_data["noun_type_reason"] = reason
+                    word.noun_type = noun_type
+                    word.noun_type_reason = reason
+                    
+                    # Log potential persons
                     if noun_type.value == "person":
                         potential_persons[tok] += 1
-                    elif token_type == TokenType.PROPER_NOUN:
+                    elif isinstance(word, DO.ProperNoun):
+                        # Log proper nouns that weren't classified as persons
                         Logger.debug(f"Proper noun NOT classified as person: '{tok}' (reason: {reason})")
-                elif token_type == TokenType.VERB:
-                    verb_data = get_verb_data(tok, words_list_dict, j)
-                    token_data['verb_data'] = {
-                        "infinitive": verb_data.infinitive,
-                        "mood": mood_map_inv[verb_data.mood],
-                        "tense": tense_map_inv[verb_data.tense],
-                        "pronoun": pronoun_map_inv[verb_data.pronoun]
-                    }
-                words_list_dict.append(token_data)
+                        
+                elif isinstance(word, DO.Verb):
+                    verb_data = get_verb_data(tok, [w.word for w in words_list_dict], j)
+                    word.infinitive = verb_data.infinitive
+                    word.mood = verb_data.mood
+                    word.tense = verb_data.tense
+                    word.pronoun = verb_data.pronoun
+                    
+                words_list_dict.append(word)
         if words_list_dict:
-            result.append({
-                "sentence_index": item["sentence_index"],
-                "original_sentence": item["original_sentence"],
-                "full_sentence": item["full_sentence"],
-                "maybe_incomplete": item["maybe_incomplete"],
-                "page_index": item["page_index"],
-                "words": words_list_dict
-            })
+            item.words = words_list_dict
+            result.append(item)
+    
+    # Log summary of potential persons
     Logger.info(f"Found {len(potential_persons)} potential person entities")
     sorted_persons = sorted(potential_persons.items(), key=lambda x: x[1], reverse=True)
     Logger.debug(f"Top 20 potential persons:\n" + "\n".join([f"  {name}: {count}" for name, count in sorted_persons[:20]]))
     return result
 
-def merge_determiners_nouns(result: list[dict]) -> list[dict]:
+def merge_determiners_nouns(result: list[DO.Sentence]) -> list[DO.Sentence]:
+    """
+    Merge determiners with the following noun into a single token
+    if the noun is a common noun representing a person.
+    """
     for sentence in result:
-        words = sentence["words"]
-        merged_words = []
-        skip_next = False
+        words = sentence.words
+        merged_words : list[DO.Word] = []
         for i in range(len(words)):
-            if skip_next:
-                skip_next = False
-                continue
-            word_info = words[i]
-            if (word_info["type"] == TokenType.DETERMINER.value and
-                i + 1 < len(words) and
-                words[i + 1]["type"] == TokenType.COMMON_NOUN.value and
-                words[i + 1].get("noun_type") == "person"):
-                merged_word = {
-                    "word": word_info["word"] + " " + words[i + 1]["word"],
-                    "position": word_info["position"],
-                    "type": TokenType.COMMON_NOUN.value,
-                    "noun_type": "person",
-                    "noun_type_reason": f"merged determiner with person common noun (from '{words[i + 1]['noun_type_reason']}')"
-                }
-                merged_words.append(merged_word)
-                skip_next = True
+            word = words[i]
+            if (isinstance(word, DO.Determiner) and
+                i + 1 < len(words)):
+                next_word = words[i+1]
+                if (isinstance(next_word, DO.CommonNoun) and next_word.noun_type == NounType.PERSON):
+                    word = DO.CommonNoun(f"{word.word} {next_word.word}", word.position)
+                    word.noun_type = NounType.PERSON
+                    word.noun_type_reason = f"merged determiner with person common noun (from '{next_word.noun_type_reason}')"
+                    sentence.words[i] = word
+                    sentence.words.pop(i+1)
             else:
-                merged_words.append(word_info)
-        sentence["words"] = merged_words
+                merged_words.append(word)
+        sentence.words = merged_words
     return result
 
 def get_book_chapter(input_file: str) -> tuple[str, int]:
@@ -360,11 +390,12 @@ def _is_blacklisted(name: str) -> bool:
     return name.lower().strip() in PERSON_BLACKLIST
 
 
-def filter_word_count(word_count: dict[str, int]) -> dict[str, int]:
-    filtered = {n: c for n, c in word_count.items() if not _is_blacklisted(n)}
+def filter_word_count(word_count: dict[DO.Noun, DO.WordOccurence]) -> dict[DO.Noun, DO.WordOccurence]:
+    """Supprime les entrées non-personnes du word_count."""
+    filtered = {n: c for n, c in word_count.items() if not _is_blacklisted(n.word)}
     removed = set(word_count) - set(filtered)
     if removed:
-        Logger.info(f"Blacklist: {len(removed)} entrées supprimées → {sorted(removed)}")
+        Logger.info(f"Blacklist: {len(removed)} entrées supprimées → {sorted(removed, key=lambda x: x.word)}")
     return filtered
 
 
@@ -378,11 +409,11 @@ def clean_ocr_text(text: str) -> str:
     return text
 
 
-def extract_persons_spacy(text: str) -> dict[str, int]:
+def extract_persons_spacy(text: str) -> dict[str, DO.WordOccurence]:
     nlp = get_nlp()
     text = clean_ocr_text(text)
     MAX_CHUNK = 100_000
-    spacy_counts: dict[str, int] = {}
+    spacy_counts: dict[str, DO.WordOccurence] = {}
     STRIP_CHARS = ".,;:!?\"'()[]{}«»\u201c\u201d\u2018\u2019\u2014-\u2013\u2026"
     for start in range(0, len(text), MAX_CHUNK):
         doc = nlp(text[start:start + MAX_CHUNK])
@@ -394,21 +425,25 @@ def extract_persons_spacy(text: str) -> dict[str, int]:
                 continue
             if _is_blacklisted(name):
                 continue
-            spacy_counts[name] = spacy_counts.get(name, 0) + 1
+            occurrence = spacy_counts.get(name)
+            if occurrence is None:
+                occurrence = DO.WordOccurence(0, [])
+                spacy_counts[name] = occurrence
+            occurrence.quantity += 1
     Logger.info(f"spaCy NER: {len(spacy_counts)} entités PER après filtre")
     return spacy_counts
 
 
-def merge_word_counts(primary: dict[str, int],
-                      secondary: dict[str, int],
-                      min_spacy_count: int = 2) -> dict[str, int]:
-    merged = dict(primary)
+def merge_word_counts(primary: dict[str, DO.WordOccurence],
+                      secondary: dict[str, DO.WordOccurence],
+                      min_spacy_count: int = 2) -> dict[str, DO.WordOccurence]:
     for name, count in secondary.items():
-        if name in merged:
-            merged[name] += count
-        elif count >= min_spacy_count:
-            merged[name] = count
-    return dict(sorted(merged.items(), key=lambda x: x[1], reverse=True))
+        if name in primary:
+            primary[name].quantity += count.quantity
+            primary[name].sentences = list(set(primary[name].sentences) | set(count.sentences))
+        elif count.quantity >= min_spacy_count:
+            primary[name] = count
+    return dict(sorted(primary.items(), key=lambda x: x[1].quantity, reverse=True))
 
 
 def build_characters_graph(
@@ -440,7 +475,10 @@ def build_characters_graph(
     with open(input_file, "r", encoding="utf-8") as f:
         raw_text = f.read()
     spacy_wc = extract_persons_spacy(raw_text)
-    word_count = merge_word_counts(word_count, spacy_wc, min_spacy_count=2)
+
+    # Fusion (entités spaCy nouvelles uniquement si vues >= 2 fois)
+    str_key_word_count = {n.word: c for n, c in word_count.items()}
+    word_count = merge_word_counts(str_key_word_count, spacy_wc, min_spacy_count=2)
     Logger.info(f"NER fusionné: {len(word_count)} personnages")
 
     # Résolution d'alias

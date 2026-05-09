@@ -3,6 +3,8 @@ import json
 import os
 import re
 
+from .data_objects import DataObject as DO
+
 ALIAS_MAP_PATH = "networker/data/alias_map.json"
 
 PARTICLES = {"de", "du", "des", "von", "van", "le", "la", "les", "l", "d"}
@@ -91,7 +93,7 @@ def load_alias_map() -> list[list[str]]:
 
 
 def resolve_aliases(persons: list[str],
-                    word_count: dict[str, int] | None = None) -> list[list[str]]:
+                    word_count: dict[str, DO.WordOccurence] | None = None) -> list[list[str]]:
     """
     Regroupe les alias d'une liste de noms de personnages.
 
@@ -175,7 +177,7 @@ def resolve_aliases(persons: list[str],
 
     def sort_key(name: str) -> int:
         if word_count:
-            return word_count.get(name, 0)
+            return word_count.get(name, DO.WordOccurence(0, [])).quantity
         return len(name.split())
 
     return [sorted(g, key=sort_key, reverse=True) for g in final_groups]
