@@ -71,18 +71,28 @@
   },
   {
     "a": "baley",
-    "b": "r. daneel",
+    "b": "r daneel",
     "polarity": 1
   },
   {
     "a": "baley",
-    "b": "r. sammy",
+    "b": "r sammy",
     "polarity": 0
   },
   {
     "a": "baley",
     "b": "sarton",
     "polarity": 0
+  },
+  {
+    "a": "barr",
+    "b": "inutile",
+    "polarity": 1
+  },
+  {
+    "a": "barr",
+    "b": "pouvez",
+    "polarity": 1
   },
   {
     "a": "benastra",
@@ -97,6 +107,21 @@
   {
     "a": "clousarr",
     "b": "dr sarton",
+    "polarity": -1
+  },
+  {
+    "a": "commason",
+    "b": "conquerant",
+    "polarity": 1
+  },
+  {
+    "a": "commason",
+    "b": "le mulet",
+    "polarity": -1
+  },
+  {
+    "a": "conquerant",
+    "b": "riose",
     "polarity": -1
   },
   {
@@ -115,6 +140,16 @@
     "polarity": 1
   },
   {
+    "a": "devers",
+    "b": "forell",
+    "polarity": 1
+  },
+  {
+    "a": "devers",
+    "b": "seldon",
+    "polarity": -1
+  },
+  {
     "a": "dors",
     "b": "seldon",
     "polarity": 1
@@ -131,13 +166,33 @@
   },
   {
     "a": "dr sarton",
-    "b": "r. daneel",
+    "b": "r daneel",
     "polarity": 1
   },
   {
     "a": "dr sarton",
-    "b": "r. sammy",
+    "b": "r sammy",
     "polarity": 0
+  },
+  {
+    "a": "ebling",
+    "b": "le mulet",
+    "polarity": -1
+  },
+  {
+    "a": "ebling",
+    "b": "magnifiee",
+    "polarity": 1
+  },
+  {
+    "a": "ebling",
+    "b": "pouvez",
+    "polarity": 1
+  },
+  {
+    "a": "ebling",
+    "b": "seldon",
+    "polarity": -1
   },
   {
     "a": "elie",
@@ -151,13 +206,53 @@
   },
   {
     "a": "enderby",
-    "b": "r. sammy",
+    "b": "r sammy",
     "polarity": 0
   },
   {
-    "a": "fastolfe",
-    "b": "r. daneel",
+    "a": "excellence",
+    "b": "le mulet",
     "polarity": 1
+  },
+  {
+    "a": "excellence",
+    "b": "pritcher",
+    "polarity": -1
+  },
+  {
+    "a": "fastolfe",
+    "b": "r daneel",
+    "polarity": 1
+  },
+  {
+    "a": "forell",
+    "b": "salvor hardin",
+    "polarity": 1
+  },
+  {
+    "a": "forell",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
+    "a": "fran",
+    "b": "pouvez",
+    "polarity": 1
+  },
+  {
+    "a": "hella",
+    "b": "le mulet",
+    "polarity": 1
+  },
+  {
+    "a": "hober mallow",
+    "b": "salvor hardin",
+    "polarity": 1
+  },
+  {
+    "a": "horleggor",
+    "b": "le mulet",
+    "polarity": -1
   },
   {
     "a": "hummin",
@@ -166,7 +261,7 @@
   },
   {
     "a": "hummin",
-    "b": "l'empereur",
+    "b": "lempereur",
     "polarity": 1
   },
   {
@@ -182,6 +277,41 @@
   {
     "a": "hummin",
     "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "inchney",
+    "b": "le mulet",
+    "polarity": -1
+  },
+  {
+    "a": "indbur",
+    "b": "le mulet",
+    "polarity": -1
+  },
+  {
+    "a": "indbur",
+    "b": "pritcher",
+    "polarity": -1
+  },
+  {
+    "a": "inutile",
+    "b": "pouvez",
+    "polarity": -1
+  },
+  {
+    "a": "inutile",
+    "b": "riose",
+    "polarity": 1
+  },
+  {
+    "a": "inutile",
+    "b": "siwenna",
+    "polarity": 1
+  },
+  {
+    "a": "iwo",
+    "b": "radole",
     "polarity": 1
   },
   {
@@ -206,7 +336,7 @@
   },
   {
     "a": "jessie",
-    "b": "r. daneel",
+    "b": "r daneel",
     "polarity": -1
   },
   {
@@ -225,14 +355,14 @@
     "polarity": 0
   },
   {
-    "a": "l'empereur",
-    "b": "rachelle",
-    "polarity": 1
-  },
-  {
     "a": "leggen",
     "b": "seldon",
     "polarity": -1
+  },
+  {
+    "a": "lempereur",
+    "b": "rachelle",
+    "polarity": 1
   },
   {
     "a": "mannix",
@@ -265,6 +395,26 @@
     "polarity": 1
   },
   {
+    "a": "neotrantor",
+    "b": "toran",
+    "polarity": 1
+  },
+  {
+    "a": "patricien",
+    "b": "voulez",
+    "polarity": -1
+  },
+  {
+    "a": "pouvez",
+    "b": "randu",
+    "polarity": 1
+  },
+  {
+    "a": "pouvez",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
     "a": "rachelle",
     "b": "seldon",
     "polarity": 1
@@ -275,6 +425,16 @@
     "polarity": 1
   },
   {
+    "a": "randu",
+    "b": "seigneur",
+    "polarity": -1
+  },
+  {
+    "a": "randu",
+    "b": "seldon",
+    "polarity": 1
+  },
+  {
     "a": "raych",
     "b": "seldon",
     "polarity": 1
@@ -282,6 +442,11 @@
   {
     "a": "raych",
     "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "riose",
+    "b": "seldon",
     "polarity": 1
   },
   {
@@ -291,7 +456,17 @@
   },
   {
     "a": "seldon",
+    "b": "toran",
+    "polarity": 1
+  },
+  {
+    "a": "seldon",
     "b": "venabili",
+    "polarity": 1
+  },
+  {
+    "a": "toran",
+    "b": "voulez",
     "polarity": 1
   }
 ]

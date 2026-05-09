@@ -49,6 +49,12 @@ _TOKEN_TYPE_TO_DO_CLASS: dict[TokenType, type] = {
     TokenType.VERB: DO.Verb,
     TokenType.ADVERB: DO.Adverb,
     TokenType.DETERMINER: DO.Determiner,
+    TokenType.PRONOUN: DO.Pronoun,
+    TokenType.ADJECTIVE: DO.Adjective,
+    TokenType.PREPOSITION: DO.Preposition,
+    TokenType.CONJUNCTION: DO.Conjunction,
+    TokenType.INTERJECTION: DO.Interjection,
+    TokenType.ACRONYM: DO.Acronym,
 }
 
 # Thresholds for promotion/demotion of proper-noun candidates
@@ -334,7 +340,7 @@ PERSON_BLACKLIST: frozenset[str] = frozenset({
     "mycogeniens", "mycogéniens", "mycogénien", "mycogénienne", "mycogéniennes",
     "kanite",
     # Entités non-personnages Fondation
-    "encyclopaedia galactica", "encyclopaedia", "galactica",
+    "encyclopaedia galactica", "encyclopedia galactica", "encyclopaedia", "encyclopedia", "galactica",
     "plan seldon", "plan", "empire galactique", "empire",
     "premiere fondation", "seconde fondation", "fondation",
     "goutte-de-pluie quarante", "goutte-de-pluie", "goutte de pluie",
@@ -396,6 +402,8 @@ def filter_word_count(word_count: dict[DO.Noun, DO.WordOccurence]) -> dict[DO.No
     removed = set(word_count) - set(filtered)
     if removed:
         Logger.info(f"Blacklist: {len(removed)} entrées supprimées → {sorted(removed, key=lambda x: x.word)}")
+    else:
+        Logger.info("Blacklist: aucune entrée supprimée")
     return filtered
 
 
