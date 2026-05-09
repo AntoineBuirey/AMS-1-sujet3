@@ -305,8 +305,16 @@ def get_book_chapter(input_file: str) -> tuple[str, int]:
     base_name = os.path.basename(input_file)
     match = re.match(r"([a-zA-Z]+)[._-]chapter[_-](\d+)\.txt$", base_name)
     if not match:
-        raise ValueError(f"Input file name {base_name} does not match expected pattern '[code].chapter_[number].txt'")
+        return "base_name", 0
+        # raise ValueError(f"Input file name {base_name} does not match expected pattern '[code].chapter_[number].txt'")
     return match.group(1), int(match.group(2))
+
+def is_input_chapter(input_file: str) -> bool:
+    try:
+        get_book_chapter(input_file)
+        return True
+    except ValueError:
+        return False
 
 
 # =============================================================================
@@ -558,7 +566,10 @@ def main():
         code, chap = get_book_chapter(path)
         return (0 if code == "paf" else 1, chap)
 
-    input_files = sorted(input_files, key=_sort_key)
+    if not is_input_chapter(input_files[0]):
+        Logger.warning("Input files do not match expected chapter file pattern. Processing in arbitrary order.")
+    else:
+        input_files = sorted(input_files, key=_sort_key)
 
     # Réinitialiser le registre de polarité à chaque changement de livre
     current_book = None

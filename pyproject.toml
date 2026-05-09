@@ -28,7 +28,8 @@ dependencies = [
 "six==1.17.0",
 "spacy>=3.8.11",
 "tqdm==4.67.1",
-"pandas==2.2.3"
+"pandas==2.2.3",
+"pypdf>=6.11.0"
 ]
 [project.optional-dependencies]
 ai = ["google-genai"]

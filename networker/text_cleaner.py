@@ -1,13 +1,27 @@
 """Utilities for cleaning OCR-like text extracted from the sample novels."""
 
-from __future__ import annotations
-
 import re
+from pypdf import PdfReader
 
 from .standardizer import normalize_apostrophes
 
 
 _PAGE_MARKER_RE = re.compile(r"^\s*-\s*\d+\s*-\s*$")
+
+
+def read_pdf(pdf_path: str) -> str:
+    """Extract text from a PDF file."""
+    reader = PdfReader(pdf_path)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"
+    return text
+
+
+def read_text_file(text_path: str) -> str:
+    """Read text from a file."""
+    with open(text_path, "r", encoding="utf-8") as f:
+        return f.read()
 
 
 def clean_text(text: str) -> str:
@@ -54,10 +68,13 @@ def main():
     parser = argparse.ArgumentParser(description="Clean raw book text.")
     parser.add_argument("input_file", help="Path to the input text file.")
     parser.add_argument("output_file", help="Path to the output cleaned text file.")
+    parser.add_argument("--pdf", "-p", action="store_true", help="Indicates that the input file is a PDF.")
     args = parser.parse_args()
 
-    with open(args.input_file, "r", encoding="utf-8") as f:
-        raw_text = f.read()
+    if args.pdf or args.input_file.lower().endswith(".pdf"):
+        raw_text = read_pdf(args.input_file)
+    else:
+        raw_text = read_text_file(args.input_file)
 
     cleaned_text = clean_text(raw_text)
 
