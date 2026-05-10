@@ -311,8 +311,9 @@ def get_book_chapter(input_file: str) -> tuple[str, int]:
     base_name = os.path.basename(input_file)
     match = re.match(r"([a-zA-Z]+)[._-]chapter[_-](\d+)\.txt$", base_name)
     if not match:
-        return "base_name", 0
-        # raise ValueError(f"Input file name {base_name} does not match expected pattern '[code].chapter_[number].txt'")
+        base_name_no_ext = os.path.splitext(base_name)[0]
+        Logger.warning(f"Input file name '{base_name}' does not match expected pattern '[code].chapter_[number].txt'. Defaulting to book code '{base_name_no_ext}' and chapter number 0.")
+        return base_name_no_ext, 0
     return match.group(1), int(match.group(2))
 
 def is_input_chapter(input_file: str) -> bool:
@@ -382,28 +383,39 @@ PERSON_BLACKLIST: frozenset[str] = frozenset({
     # Dynasties / organisations
     "dynastie entun",
     # Autres faux positifs
-    "historienne", "renégat", "renegat",
+    "historienne", "renégat", "renegat", "hein", "inutile", "iii"
+    # Verbes mal classifiés
+    "voulez", "tenez", "range", "senter"
 })
 
 
-def _is_blacklisted(name: str) -> bool:
+def _is_blacklisted(name: str) -> tuple[bool, str|None]:
     if "\n" in name:
-        return True
+        return True, "name contains newline"
     if len(name) > 50:
-        return True
+        return True, "name too long"
     if not any(c.isalpha() for c in name):
-        return True
-    return name.lower().strip() in PERSON_BLACKLIST
+        return True, "name contains no letters"
+    normalized_name = name.lower().strip()
+    if normalized_name in PERSON_BLACKLIST:
+        return True, "name is in blacklist"
+    return False, None
 
 
-def filter_word_count(word_count: dict[DO.Noun, DO.WordOccurence]) -> dict[DO.Noun, DO.WordOccurence]:
+def filter_word_count(word_count: dict[str, DO.WordOccurence]) -> dict[str, DO.WordOccurence]:
     """Supprime les entrées non-personnes du word_count."""
-    filtered = {n: c for n, c in word_count.items() if not _is_blacklisted(n.word)}
-    removed = set(word_count) - set(filtered)
-    if removed:
-        Logger.info(f"Blacklist: {len(removed)} entrées supprimées → {sorted(removed, key=lambda x: x.word)}")
-    else:
-        Logger.info("Blacklist: aucune entrée supprimée")
+    Logger.set_module("wc_filter")
+    filtered = {}
+    removed_count = 0
+    for n, c in word_count.items():
+        blacklisted, reason = _is_blacklisted(n)
+        if blacklisted:
+            removed_count += 1
+            Logger.debug(f"Blacklist: removed '{n}' (reason: {reason})")
+        else:
+            filtered[n] = c
+            Logger.debug(f"Kept '{n}' with count {c.quantity}")
+    Logger.info(f"Blacklist: {removed_count} entrées supprimées")
     return filtered
 
 
@@ -477,7 +489,6 @@ def build_characters_graph(
     # NER primaire
     word_count = count_occurrences(result)
     Logger.info(f"NER custom: {len(word_count)} personnages")
-    word_count = filter_word_count(word_count)
 
     # NER secondaire (spaCy)
     with open(input_file, "r", encoding="utf-8") as f:
@@ -488,6 +499,8 @@ def build_characters_graph(
     str_key_word_count = {n.word: c for n, c in word_count.items()}
     word_count = merge_word_counts(str_key_word_count, spacy_wc, min_spacy_count=2)
     Logger.info(f"NER fusionné: {len(word_count)} personnages")
+    
+    word_count = filter_word_count(word_count)
 
     # Résolution d'alias
     aliases = resolve_aliases(list(word_count.keys()), word_count=word_count)
